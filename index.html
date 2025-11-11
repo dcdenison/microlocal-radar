@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Microlocal Radar</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root{
+      --ring: rgba(0,255,0,0.42);
+      --sweepA: rgba(0,255,128,0.10);
+      --sweepB: rgba(0,255,128,0.60);
+      --text: #c8ffbe;
+      --glass: rgba(0,0,0,0.60);
+      --border: rgba(0,255,0,0.28);
+      --map-filter: grayscale(0.7) contrast(1.2) brightness(0.82);
+      --map-opacity: 0.62;
+      --dot-size: 8px;
+      --dot-size-active: 11px;
+      --ring-weight: 2.0;
+      --sweep-width-deg: 22;
+    }
+    html, body { margin:0; height:100%; background:#000; overflow:hidden; user-select:none; touch-action:none; }
+    #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
+    #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
+    canvas { width:min(94vmin, 100%); height:min(94vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 36px rgba(0,255,0,0.35); display:block; }
+
+    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:var(--text); background:var(--glass); border:1px solid var(--border); border-radius:12px; padding:6px 12px; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; }
+
+    #panel { position: fixed; top: 10px; left: 10px; z-index: 50; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .chip { padding:6px 10px; border-radius: 12px; font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; cursor:pointer; user-select:none; }
+    .chip.toggle { background:#baffbf; color:#003300; border:1px solid #77ff88; }
+    .chip.bold   { background:#ffe9bd; color:#3a2400; border:1px solid #ffd27a; }
+    .chip.input  { background:rgba(255,255,255,0.08); color:#cfe; border:1px solid var(--border); padding:0 0; }
+    .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#cfe; font: 11px 'Courier New', monospace; }
+    .chip.small  { font-size: 11px; padding: 5px 8px; }
+
+    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#bdfdbe; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,0,0,.5); padding:6px 10px; border-radius:10px; border:1px solid var(--border); z-index: 40; }
+
+    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: var(--glass); color: var(--text); font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 0 24px rgba(0,255,0,0.25); pointer-events: none; z-index: 30; }
+    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,0,0,0.4); display:grid; place-items:center; overflow:hidden; }
+    #card .img img { width:100%; height:100%; object-fit: cover; display:block; }
+    #card .img .placeholder { font-size: 13px; opacity: .8; padding: 12px; text-align:center; }
+    #card .body { padding: 10px 12px 12px; }
+    #card .title { font-weight: 600; font-size: 16px; line-height: 1.2; margin: 0 0 6px; }
+    #card .desc { font-size: 13px; opacity: .9; }
+    #card .meta { margin-top: 8px; font-size: 12px; opacity: .8; min-height: 1.2em; display:none; }
+
+    #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#bfffbf; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="map" role="application" aria-label="Microlocal Skeletal Map"></div>
+  <div id="panel">
+    <div id="toggleDemo" class="chip toggle" title="Switch Demo ↔ Live">LIVE</div>
+    <div class="chip bold" title="Bold Radar look">Bold</div>
+    <div class="chip input" title="CSV URL for Live mode"><input id="csvUrlInput" placeholder="CSV URL (output=csv)" /></div>
+    <div id="reloadBtn" class="chip small toggle" title="Reload data">Reload</div>
+    <div class="chip small" id="showUrlBtn" title="Show full CSV URL" style="background:#e0f0ff; color:#003366; border:1px solid #88c0ff;">Show URL</div>
+    <div class="chip small" id="kioskToggle" title="Toggle Kiosk Mode (hides controls)">Kiosk: OFF</div>
+    <div class="chip small" id="debugToggle" title="Toggle Debug Info" style="background:#ffd7a3; color:#3a2400; border:1px solid #ffb366;">Debug: ON</div>
+  </div>
+  <div id="titleStrip">Microlocal Radar</div>
+  <div id="stage"><canvas id="radar"></canvas></div>
+  <div id="card" aria-live="polite">
+    <div class="img"><div class="placeholder">Image from sheet will appear here</div></div>
+    <div class="body">
+      <div class="title">Loading…</div>
+      <div class="desc">Please wait</div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+  <div id="status">Loading…</div>
+  <div id="debug"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Wait for Leaflet to be fully loaded
+    window.addEventListener('load', function() {
+      initRadar();
+    });
+    
+    function initRadar() {
+    // --- CONFIG ---
+    let KIOSK_MODE = false;
+
+    const DEFAULTS = {
+      useDemo: false,
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ9tkXhhRDZyHIHrfiLg41w-NIOgDL8oS6fez0yVmBY9tJfBWDIRJ0a4hLrELvAWM1RZSxYDM09Yfg/pub?gid=632827062&single=true&output=csv",
+      preset: "bold",
+      declump: false
+    };
+    const STATE = loadState();
+    function loadState(){
+      try{ 
+        // Clear old cache and force new URL
+        localStorage.removeItem("microlocal-v10-1");
+        return {...DEFAULTS}; 
+      }
+      catch{ return {...DEFAULTS}; }
+    }
+    function saveState(){ localStorage.setItem("microlocal-v10-1", JSON.stringify(STATE)); }
+
+    const urlParams = new URLSearchParams(location.search);
+    const urlOverride = {
+      clat: parseFloat(urlParams.get('clat')),
+      clng: parseFloat(urlParams.get('clng')),
+      cname: urlParams.get('cname'),
+      crow: urlParams.get('crow') !== null ? parseInt(urlParams.get('crow'),10) : null,
+      kiosk: urlParams.get('kiosk')
+    };
+    if (urlOverride.kiosk) KIOSK_MODE = urlOverride.kiosk === "1" || urlOverride.kiosk === "true";
+
+    function applyPreset(){
+      document.documentElement.style.setProperty("--map-filter", "grayscale(0.7) contrast(1.2) brightness(0.82)");
+      document.documentElement.style.setProperty("--map-opacity", 0.62);
+      document.documentElement.style.setProperty("--ring-weight", 2.0);
+      document.documentElement.style.setProperty("--dot-size", "8px");
+      document.documentElement.style.setProperty("--dot-size-active", "11px");
+      document.documentElement.style.setProperty("--sweep-width-deg", 22);
+    }
+
+    const FIXED_RADIUS_MILES = 1.5;  // Zoomed in for hyperlocal cluster of locations
+    const JITTER_DEG         = 8.0;  // Moderate jitter for visual spread
+    const DECLUMP_MIN_PX     = 16;
+
+    const toggleDemo  = document.getElementById("toggleDemo");
+    const csvUrlInput = document.getElementById("csvUrlInput");
+    const reloadBtn   = document.getElementById("reloadBtn");
+    const showUrlBtn  = document.getElementById("showUrlBtn");
+    const kioskToggle = document.getElementById("kioskToggle");
+    const debugToggle = document.getElementById("debugToggle");
+    const panelEl     = document.getElementById("panel");
+    const debugEl     = document.getElementById("debug");
+    const statusEl    = document.getElementById("status");
+    
+    let showDebug = true;
+
+    function reflectUI(){
+      toggleDemo.textContent = STATE.useDemo ? "DEMO" : "LIVE";
+      csvUrlInput.value = STATE.csvUrl || "";
+      kioskToggle.textContent = "Kiosk: " + (KIOSK_MODE ? "ON" : "OFF");
+      debugToggle.textContent = "Debug: " + (showDebug ? "ON" : "OFF");
+      applyPreset();
+      if (KIOSK_MODE){
+        panelEl.style.display = "none";
+        debugEl.style.display = "none";
+        setTimeout(()=>{ statusEl.style.display = "none"; }, 4000);
+      } else {
+        panelEl.style.display = "flex";
+        debugEl.style.display = showDebug ? "block" : "none";
+        statusEl.style.display = "block";
+      }
+    }
+    toggleDemo.addEventListener("click", async () => { STATE.useDemo = !STATE.useDemo; saveState(); reflectUI(); await refresh(); });
+    csvUrlInput.addEventListener("change", async (e) => { STATE.csvUrl = e.target.value.trim(); saveState(); if(!STATE.useDemo) await refresh(); });
+    reloadBtn.addEventListener("click", async () => { await refresh(); });
+    showUrlBtn.addEventListener("click", () => { alert("Current CSV URL:\n\n" + STATE.csvUrl); });
+    kioskToggle.addEventListener("click", () => { KIOSK_MODE = !KIOSK_MODE; reflectUI(); });
+    debugToggle.addEventListener("click", () => { showDebug = !showDebug; reflectUI(); });
+
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+    const EARTH_MILES = 3958.7613;
+    function haversineMiles(a, b) { const dLat = toRad(b.lat - a.lat); const dLon = toRad(b.lng - a.lng); const lat1 = toRad(a.lat), lat2 = toRad(b.lat); const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2; return 2 * EARTH_MILES * Math.asin(Math.min(1, Math.sqrt(h))); }
+    function bearingDeg(a, b) { const φ1 = toRad(a.lat), φ2 = toRad(b.lat); const λ1 = toRad(a.lng), λ2 = toRad(b.lng); const y = Math.sin(λ2-λ1) * Math.cos(φ2); const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1); return (toDeg(Math.atan2(y, x)) + 360) % 360; }
+    function stableRand(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=(h*16777619)>>>0; } return (h%10000)/10000; }
+
+    const canvas = document.getElementById('radar');
+    const ctx = canvas.getContext('2d');
+    function fitCanvas(){ const dpr = Math.max(1, window.devicePixelRatio || 1); const size = Math.min(window.innerWidth, window.innerHeight) * 0.94; canvas.style.width = size+"px"; canvas.style.height = size+"px"; canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr); ctx.setTransform(dpr,0,0,dpr,0,0); }
+    window.addEventListener('resize', fitCanvas, {passive:true}); fitCanvas();
+
+    let map, base, labels, mileCircle, pointsLayer, centerMarker;
+    const BASE_URL = 'https://{s}.basemaps.cartocdn.com';
+    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffffff;border:1px solid #6f6;box-shadow:0 0 14px #9f9;filter:drop-shadow(0 0 4px #7CFC00)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
+    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#fff;border:1px solid #4f4;box-shadow:0 0 12px #fff"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
+
+    function ensureMap(lat=42.36077, lng=-71.13457){
+      if (map) return;
+      map = L.map('map', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+      base = L.tileLayer(BASE_URL + "/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }).addTo(map);
+      labels = L.tileLayer(BASE_URL + "/light_only_labels/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', opacity: 0.58 }).addTo(map);
+      pointsLayer = L.layerGroup().addTo(map);
+      map.setView([lat, lng], 17);  // Increased zoom from 15 to 17
+      setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    function updateMapLayers(center, others){
+      ensureMap(center.lat, center.lng);
+      if (centerMarker) centerMarker.remove();
+      centerMarker = L.marker([center.lat, center.lng], { icon: new CenterIcon() }).addTo(map);
+      if (mileCircle) mileCircle.remove();
+      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#57ff57', weight: 1, fillColor: '#57ff57', fillOpacity: 0.05 }).addTo(map);  // Changed to 1.5 miles
+      pointsLayer.clearLayers();
+      others.forEach(p => { L.marker([p.lat, p.lng], { icon: new DotIcon() }).addTo(pointsLayer); });
+      const bounds = mileCircle.getBounds();
+      map.fitBounds(bounds.pad(0.15), { animate: false });  // Increased padding slightly from 0.12 to 0.15
+      map.setMaxBounds(bounds.pad(0.30));  // Increased from 0.25 to 0.30
+      setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    let points = []; let center = null; let sweep = 0; let activeIndex = 0;
+
+    function exaggerate(frac){ 
+      return Math.min(1, Math.max(0, frac)); 
+    }
+    function projectMicrolocal(p){
+      const d = haversineMiles(center, p);
+      const b = bearingDeg(center, p);
+      const w = canvas.width / (window.devicePixelRatio||1);
+      const R = (w/2) - 16;
+      const frac = Math.min(1, d / FIXED_RADIUS_MILES);
+      const e = exaggerate(frac);
+      const seed = (p.name||'') + '|' + p.lat + '|' + p.lng;
+      // Use geographic bearing with jitter for spread
+      const jitter = (stableRand(seed) - 0.5) * (JITTER_DEG * 2);
+      const angle = (b - 90 + jitter) * Math.PI/180;
+      const rad = e * R;
+      
+      return { x: (w/2) + Math.cos(angle) * rad, y: (w/2) + Math.sin(angle) * rad, distance: d };
+    }
+
+    function resolveOverlap(coords, cx, cy, maxR, minSep = DECLUMP_MIN_PX){
+      if (!STATE.declump || coords.length < 2) return coords;
+      const iters = 30;  // Reduced iterations
+      for (let k = 0; k < iters; k++){
+        let moved = false;
+        for (let i = 0; i < coords.length; i++){
+          for (let j = i+1; j < coords.length; j++){
+            const a = coords[i], b = coords[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            let d = Math.hypot(dx, dy) || 0.0001;
+            if (d < minSep){
+              const push = (minSep - d) / 2.5;  // Gentler push
+              const ux = dx / d, uy = dy / d;
+              a.x -= ux * push; a.y -= uy * push;
+              b.x += ux * push; b.y += uy * push;
+              moved = true;
+            }
+          }
+        }
+        for (const p of coords){
+          const rx = p.x - cx, ry = p.y - cy;
+          const rd = Math.hypot(rx, ry);
+          if (rd > maxR - 12){
+            const s = (maxR - 12) / rd;
+            p.x = cx + rx * s; p.y = cy + ry * s;
+          }
+        }
+        if (!moved) break;
+      }
+      return coords;
+    }
+
+    function draw(){
+      const w = canvas.width / (window.devicePixelRatio||1);
+      const h = w; const r = w/2;
+      ctx.clearRect(0,0,w,h);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(r, r, r-2, 0, Math.PI*2); ctx.clip();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(0,0,w,h);
+
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ring');
+      ctx.lineWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ring-weight')) || 1.6;
+      for(let i=1;i<=4;i++){ ctx.beginPath(); ctx.arc(r, r, (r-14)*(i/4), 0, Math.PI*2); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(r,12); ctx.lineTo(r,h-12); ctx.moveTo(12,r); ctx.lineTo(w-12,r); ctx.stroke();
+
+      const grad = ctx.createRadialGradient(r,r,0,r,r,r);
+      grad.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--sweepA'));
+      grad.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--sweepB'));
+      ctx.fillStyle = grad;
+      const sweepWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sweep-width-deg')) || 18;
+      const start = (sweep - sweepWidth/2)*Math.PI/180, end = (sweep + sweepWidth/2)*Math.PI/180;
+      ctx.beginPath(); ctx.moveTo(r,r); ctx.arc(r,r,r-10,start,end); ctx.closePath(); ctx.fill();
+
+      let coords = points.map(projectMicrolocal).map((p,i)=>({x:p.x, y:p.y, i, distance: p.distance}));
+      coords = resolveOverlap(coords, r, r, r-10, DECLUMP_MIN_PX);
+
+      for (const c of coords){
+        const isActive = c.i===activeIndex;
+        const distFrac = Math.min(1, (c.distance || 0) / FIXED_RADIUS_MILES);
+        
+        const baseSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-size')) || 7;
+        const activeSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-size-active')) || 9;
+        const distanceScale = 1.4 - (distFrac * 0.6);
+        const size = (isActive ? activeSize : baseSize) * distanceScale;
+        
+        const opacity = 0.7 + (1 - distFrac) * 0.3;
+        
+        ctx.beginPath();
+        ctx.fillStyle = isActive ? '#ffffff' : `rgba(124, 252, 0, ${opacity})`;
+        ctx.arc(c.x, c.y, size, 0, Math.PI*2); 
+        ctx.fill();
+        
+        if (isActive){
+          const t = (Date.now()%1000)/1000; const pulse = 11 + Math.sin(t*Math.PI*2)*3.0;
+          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.8;
+          ctx.arc(c.x, c.y, 13 + pulse, 0, Math.PI*2); ctx.stroke();
+        }
+      }
+
+      ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
+
+      ctx.restore();
+    }
+
+    async function loadCSVOnce(url){
+      return new Promise((resolve, reject) => {
+        console.log("Attempting to load CSV from:", url);
+        Papa.parse(url, { 
+          download: true, 
+          header: true, 
+          skipEmptyLines: true,
+          complete: (res) => {
+            console.log("CSV loaded successfully:", res.data.length, "rows");
+            console.log("First row:", res.data[0]);
+            resolve(res.data);
+          }, 
+          error: (err) => {
+            console.error("CSV load error:", err);
+            reject(err);
+          } 
+        });
+      });
+    }
+
+    function pickField(obj, names, regexes=[]){
+      for (const key of Object.keys(obj)) { if (names.some(n => n.toLowerCase() === String(key).trim().toLowerCase())) return obj[key]; }
+      for (const key of Object.keys(obj)) { if (regexes.some(rx => rx.test(String(key)))) return obj[key]; }
+      return undefined;
+    }
+    function toNum(v){ const n = parseFloat(String(v ?? "").replace(/[^\d.+-]/g,"").trim()); return Number.isFinite(n) ? n : NaN; }
+    function truthy(v){ const s = String(v ?? "").trim().toLowerCase(); return ['1','true','yes','y','t'].includes(s); }
+
+    function normalizeRow(row){
+      const name = pickField(row, ["name","title","place"], [/(name|title|place)/i]);
+      const lat = toNum(pickField(row, ["lat","latitude"], [/(lat|latitude)/i]));
+      const lng = toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i]));
+      const notes = pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]);
+      const image = pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]);
+      const is_center = truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i]));
+      return { name, lat, lng, notes, image, is_center, raw: row };
+    }
+
+    function chooseCenter(validRows){
+      const clat = parseFloat(new URLSearchParams(location.search).get('clat'));
+      const clng = parseFloat(new URLSearchParams(location.search).get('clng'));
+      if (Number.isFinite(clat) && Number.isFinite(clng)) return { name: new URLSearchParams(location.search).get('cname') || "Center (URL)", lat: clat, lng: clng };
+      const cname = new URLSearchParams(location.search).get('cname');
+      if (cname){ const n = cname.trim().toLowerCase(); const byName = validRows.find(r => (r.name||'').trim().toLowerCase() === n || (r.name||'').trim().toLowerCase().startsWith(n)); if (byName) return byName; }
+      const crow = parseInt(new URLSearchParams(location.search).get('crow'),10); if (Number.isInteger(crow) && validRows[crow]) return validRows[crow];
+      const flagged = validRows.filter(r => r.is_center);
+      if (flagged.length === 1) return flagged[0];
+      return validRows[0] || null;
+    }
+
+    const card = document.getElementById('card');
+    const imgWrap = card.querySelector('.img');
+    const titleEl = card.querySelector('.title');
+    const descEl = card.querySelector('.desc');
+
+    function setCard(p){
+      titleEl.textContent = p.name || 'Untitled';
+      descEl.textContent = p.notes || '';
+      imgWrap.innerHTML='';
+      if (p.image){
+        const img=new Image(); img.alt=p.name||''; img.decoding='async'; img.loading='eager';
+        img.onload=()=>{ imgWrap.innerHTML=''; imgWrap.appendChild(img); };
+        img.onerror=()=>{
+          const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+          imgWrap.innerHTML=''; imgWrap.appendChild(f);
+        };
+        img.src=p.image;
+      } else {
+        const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+        imgWrap.innerHTML=''; imgWrap.appendChild(f);
+      }
+    }
+
+    const statusEl2 = document.getElementById('status');
+
+    async function refresh(){
+      try{
+        statusEl2.textContent = 'Loading…';
+        const liveUrl = (STATE.csvUrl || "").trim();
+        console.log("=== REFRESH START ===");
+        console.log("Demo mode:", STATE.useDemo);
+        console.log("CSV URL:", liveUrl);
+        
+        const csvUrl = STATE.useDemo ? null : (liveUrl ? liveUrl + (liveUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null);
+        const raw = STATE.useDemo ? DEMO_ROWS : await loadCSVOnce(csvUrl);
+        
+        console.log("Raw data rows:", raw.length);
+        const normalized = raw.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        console.log("Valid normalized rows:", normalized.length);
+        
+        const centerRow = chooseCenter(normalized);
+        const others = normalized.filter(r => r !== centerRow);
+
+        if (!centerRow) {
+          statusEl2.textContent = 'No valid center found. Add is_center=TRUE or use URL overrides.';
+          debugEl.textContent = 'valid rows=' + normalized.length;
+          return;
+        }
+
+        window.center = center = centerRow;
+        window.points = points = others;
+
+        updateMapLayers(center, points);
+
+        const timeStr = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        statusEl2.textContent = `${points.length} places • Center: ${center?(center.name||'—'):'—'} • ${(STATE.useDemo?'DEMO':'LIVE')} • Updated ${timeStr}`;
+        
+        // Enhanced debug info
+        const debugLines = [`CENTER: "${center.name||'—'}" @ ${center.lat?.toFixed(5)}, ${center.lng?.toFixed(5)}`];
+        points.forEach((p, i) => {
+          const d = haversineMiles(center, p);
+          const b = bearingDeg(center, p);
+          debugLines.push(`${i+1}. ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
+        });
+        debugEl.innerHTML = debugLines.join('<br>');
+
+        if(points.length) setCard(points[0]);
+        draw();
+      }catch(e){
+        console.error("=== REFRESH ERROR ===");
+        console.error(e);
+        statusEl2.textContent = 'Load error. Check CSV URL / publish settings. Using DEMO data.';
+        // Fallback to demo on error
+        const normalized = DEMO_ROWS.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        const centerRow = chooseCenter(normalized);
+        const others = normalized.filter(r => r !== centerRow);
+        if (centerRow) {
+          window.center = center = centerRow;
+          window.points = points = others;
+          updateMapLayers(center, points);
+          const debugLines = [`CENTER: "${center.name||'—'}" @ ${center.lat?.toFixed(5)}, ${center.lng?.toFixed(5)}`];
+          points.forEach((p, i) => {
+            const d = haversineMiles(center, p);
+            const b = bearingDeg(center, p);
+            debugLines.push(`${i+1}. ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
+          });
+          debugEl.innerHTML = debugLines.join('<br>');
+          if(points.length) setCard(points[0]);
+          draw();
+        }
+      }
+    }
+
+    const DEMO_ROWS = [
+      {name:"(Demo header)", lat:"", lng:""},
+      {name:"Artisans Asylum", lat:42.36077, lng:-71.13457, notes:"Center (demo)", is_center:true},
+      {name:"Very Close North", lat:42.36177, lng:-71.13457, notes:"0.1 miles north"},
+      {name:"Close Northeast", lat:42.36277, lng:-71.13257, notes:"0.25 miles northeast"},
+      {name:"Medium East", lat:42.36077, lng:-71.13057, notes:"0.5 miles east"},
+      {name:"Medium South", lat:42.35877, lng:-71.13457, notes:"0.5 miles south"},
+      {name:"Far Northwest", lat:42.36477, lng:-71.14057, notes:"0.75 miles northwest"},
+      {name:"Far Southeast", lat:42.35677, lng:-71.12857, notes:"0.75 miles southeast"},
+      {name:"Edge West", lat:42.36077, lng:-71.14857, notes:"0.95 miles west"},
+      {name:"Edge Northeast", lat:42.36577, lng:-71.12857, notes:"0.9 miles northeast"}
+    ];
+
+    (function loop(){ function tick(){ sweep = (sweep + 0.95) % 360; draw(); requestAnimationFrame(tick); } tick(); })();
+    setInterval(()=>{
+      if(points.length){
+        activeIndex=(activeIndex+1)%points.length; setCard(points[activeIndex]); draw();
+      }
+    }, 20000);
+
+    document.getElementById("csvUrlInput").value = STATE.csvUrl;
+    applyPreset();
+    reflectUI();
+    refresh();
+    } // End initRadar
+  </script>
+</body>
+</html>
