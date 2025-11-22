@@ -60,7 +60,7 @@
     <div class="chip input" title="CSV URL for Live mode"><input id="csvUrlInput" placeholder="CSV URL (output=csv)" /></div>
     <div id="reloadBtn" class="chip small toggle" title="Reload data">Reload</div>
     <div class="chip small" id="showUrlBtn" title="Show full CSV URL" style="background:#e0f0ff; color:#003366; border:1px solid #88c0ff;">Show URL</div>
-    <div class="chip small" id="kioskToggle" title="Toggle Kiosk Mode (hides controls)">Kiosk: OFF</div>
+    <div class="chip small" id="kioskToggle" title="Toggle Kiosk Mode - Press 'K' to toggle (only way to exit kiosk mode)">Kiosk: OFF</div>
     <div class="chip small" id="debugToggle" title="Toggle Debug Info" style="background:#ffd7a3; color:#3a2400; border:1px solid #ffb366;">Debug: ON</div>
   </div>
   <div id="titleStrip">Microlocal Radar</div>
@@ -148,10 +148,12 @@
       debugToggle.textContent = "Debug: " + (showDebug ? "ON" : "OFF");
       applyPreset();
       if (KIOSK_MODE){
+        // Hide ALL controls in kiosk mode (use 'K' key to exit)
         panelEl.style.display = "none";
         debugEl.style.display = "none";
         setTimeout(()=>{ statusEl.style.display = "none"; }, 4000);
       } else {
+        // Show all controls
         panelEl.style.display = "flex";
         debugEl.style.display = showDebug ? "block" : "none";
         statusEl.style.display = "block";
@@ -163,6 +165,14 @@
     showUrlBtn.addEventListener("click", () => { alert("Current CSV URL:\n\n" + STATE.csvUrl); });
     kioskToggle.addEventListener("click", () => { KIOSK_MODE = !KIOSK_MODE; reflectUI(); });
     debugToggle.addEventListener("click", () => { showDebug = !showDebug; reflectUI(); });
+
+    // Keyboard shortcut: Press 'K' to toggle kiosk mode
+    document.addEventListener("keydown", (e) => {
+      if (e.key === 'k' || e.key === 'K') {
+        KIOSK_MODE = !KIOSK_MODE;
+        reflectUI();
+      }
+    });
 
     const toRad = d => d * Math.PI / 180;
     const toDeg = r => r * 180 / Math.PI;
