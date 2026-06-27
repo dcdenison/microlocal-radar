@@ -9,26 +9,26 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root{
-      --ring: rgba(0,255,0,0.42);
-      --sweepA: rgba(0,255,128,0.10);
-      --sweepB: rgba(0,255,128,0.60);
-      --text: #c8ffbe;
-      --glass: rgba(0,0,0,0.60);
-      --border: rgba(0,255,0,0.28);
-      --map-filter: grayscale(0.7) contrast(1.2) brightness(0.82);
-      --map-opacity: 0.62;
-      --dot-size: 8px;
-      --dot-size-active: 11px;
-      --ring-weight: 2.0;
-      --sweep-width-deg: 22;
+      --ring: rgba(0,220,255,0.65);
+      --sweepA: rgba(255,230,0,0.08);
+      --sweepB: rgba(255,220,0,0.72);
+      --text: #fffbe0;
+      --glass: rgba(0,10,30,0.72);
+      --border: rgba(0,220,255,0.45);
+      --map-filter: grayscale(0.2) contrast(1.1) brightness(1.05) saturate(1.2);
+      --map-opacity: 0.78;
+      --dot-size: 10px;
+      --dot-size-active: 14px;
+      --ring-weight: 2.5;
+      --sweep-width-deg: 26;
     }
     html, body { margin:0; height:100%; background:#000; overflow:hidden; user-select:none; touch-action:none; }
     #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
     #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
     #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
-    canvas { width:min(94vmin, 100%); height:min(94vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 36px rgba(0,255,0,0.35); display:block; }
+    canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 52px rgba(255,220,0,0.45), 0 0 18px rgba(0,220,255,0.30); display:block; }
 
-    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:var(--text); background:var(--glass); border:1px solid var(--border); border-radius:12px; padding:6px 12px; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; }
+    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:#ffe040; background:rgba(0,10,30,0.80); border:1px solid rgba(0,220,255,0.55); border-radius:12px; padding:6px 12px; font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; letter-spacing:0.04em; }
 
     #panel { position: fixed; top: 10px; left: 10px; z-index: 50; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
     .chip { padding:6px 10px; border-radius: 12px; font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; cursor:pointer; user-select:none; }
@@ -38,18 +38,79 @@
     .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#cfe; font: 11px 'Courier New', monospace; }
     .chip.small  { font-size: 11px; padding: 5px 8px; }
 
-    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#bdfdbe; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,0,0,.5); padding:6px 10px; border-radius:10px; border:1px solid var(--border); z-index: 40; }
+    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#cff; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,10,30,.75); padding:6px 10px; border-radius:10px; border:1px solid rgba(0,220,255,0.4); z-index: 40; }
 
-    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: var(--glass); color: var(--text); font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 0 24px rgba(0,255,0,0.25); pointer-events: none; z-index: 30; }
-    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,0,0,0.4); display:grid; place-items:center; overflow:hidden; }
+    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: rgba(0,10,30,0.88); color: #fffbe0; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid rgba(0,220,255,0.5); border-radius: 14px; overflow: hidden; box-shadow: 0 0 28px rgba(255,220,0,0.25), 0 0 10px rgba(0,220,255,0.20); pointer-events: none; z-index: 30; }
+    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,10,30,0.6); display:grid; place-items:center; overflow:hidden; }
     #card .img img { width:100%; height:100%; object-fit: cover; display:block; }
     #card .img .placeholder { font-size: 13px; opacity: .8; padding: 12px; text-align:center; }
-    #card .body { padding: 10px 12px 12px; }
-    #card .title { font-weight: 600; font-size: 16px; line-height: 1.2; margin: 0 0 6px; }
-    #card .desc { font-size: 13px; opacity: .9; }
+    #card .body { padding: 10px 12px 12px; border-top: 1px solid rgba(0,220,255,0.25); }
+    #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: #ffe040; }
+    #card .desc { font-size: 13px; opacity: .9; color: #cff; }
     #card .meta { margin-top: 8px; font-size: 12px; opacity: .8; min-height: 1.2em; display:none; }
 
     #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#bfffbf; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
+
+    /* ── PORTRAIT / SHORTS MODE ─────────────────────────────────────────── */
+    body.portrait { background: #00060f; }
+
+    body.portrait #map { bottom: 40%; }
+
+    body.portrait #stage {
+      top: 0; bottom: 40%; left: 0; right: 0;
+      position: fixed; display: grid; place-items: center;
+    }
+
+    body.portrait canvas {
+      width: 96vw; height: 96vw;
+      box-shadow: 0 0 64px rgba(255,220,0,0.50), 0 0 22px rgba(0,220,255,0.35);
+    }
+
+    body.portrait #titleStrip {
+      top: 10px; font-size: 17px; padding: 7px 16px; letter-spacing: 0.08em;
+    }
+
+    body.portrait #card {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      width: 100%; max-width: 100%;
+      border-radius: 18px 18px 0 0;
+      border-left: none; border-right: none; border-bottom: none;
+      border-top: 2px solid rgba(0,220,255,0.6);
+      display: flex; flex-direction: row;
+      height: 38%;
+      box-shadow: 0 -8px 40px rgba(255,220,0,0.20), 0 -4px 18px rgba(0,220,255,0.18);
+    }
+
+    body.portrait #card .img {
+      width: 42%; flex-shrink: 0; aspect-ratio: unset;
+      height: 100%; border-right: 1px solid rgba(0,220,255,0.25);
+    }
+
+    body.portrait #card .body {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      padding: 16px 18px; border-top: none; overflow: hidden;
+    }
+
+    body.portrait #card .title {
+      font-size: clamp(16px, 4.5vw, 26px); margin-bottom: 8px; line-height: 1.15;
+    }
+
+    body.portrait #card .desc {
+      font-size: clamp(13px, 3.2vw, 18px); opacity: 0.88; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    body.portrait #card .meta {
+      display: block; margin-top: 10px;
+      font-size: clamp(11px, 2.8vw, 15px);
+      font-family: 'Courier New', monospace;
+      color: rgba(0,220,255,0.8); opacity: 1;
+    }
+
+    body.portrait #panel,
+    body.portrait #status,
+    body.portrait #debug { display: none !important; }
   </style>
 </head>
 <body>
@@ -117,13 +178,39 @@
     };
     if (urlOverride.kiosk) KIOSK_MODE = urlOverride.kiosk === "1" || urlOverride.kiosk === "true";
 
+    // ── PORTRAIT / SHORTS MODE ───────────────────────────────────────────
+    const PORTRAIT_PARAM = urlParams.get('portrait');
+    let PORTRAIT_MODE = PORTRAIT_PARAM === '1' || PORTRAIT_PARAM === 'true'
+      || window.innerHeight > window.innerWidth;
+
+    function applyPortrait() {
+      if (PORTRAIT_MODE) {
+        document.body.classList.add('portrait');
+        KIOSK_MODE = true;  // Portrait always hides controls
+      } else {
+        document.body.classList.remove('portrait');
+      }
+    }
+
+    // Re-check on resize (e.g. rotating device)
+    window.addEventListener('resize', () => {
+      if (PORTRAIT_PARAM === null) {  // Only auto-detect if not forced via URL
+        PORTRAIT_MODE = window.innerHeight > window.innerWidth;
+      }
+      applyPortrait();
+      reflectUI();
+      if (map) setTimeout(() => map.invalidateSize(), 100);
+    }, { passive: true });
+
+    applyPortrait();
+
     function applyPreset(){
-      document.documentElement.style.setProperty("--map-filter", "grayscale(0.7) contrast(1.2) brightness(0.82)");
-      document.documentElement.style.setProperty("--map-opacity", 0.62);
-      document.documentElement.style.setProperty("--ring-weight", 2.0);
-      document.documentElement.style.setProperty("--dot-size", "8px");
-      document.documentElement.style.setProperty("--dot-size-active", "11px");
-      document.documentElement.style.setProperty("--sweep-width-deg", 22);
+      document.documentElement.style.setProperty("--map-filter", "grayscale(0.2) contrast(1.1) brightness(1.05) saturate(1.2)");
+      document.documentElement.style.setProperty("--map-opacity", 0.78);
+      document.documentElement.style.setProperty("--ring-weight", 2.5);
+      document.documentElement.style.setProperty("--dot-size", "10px");
+      document.documentElement.style.setProperty("--dot-size-active", "14px");
+      document.documentElement.style.setProperty("--sweep-width-deg", 26);
     }
 
     const FIXED_RADIUS_MILES = 1.5;  // Zoomed in for hyperlocal cluster of locations
@@ -210,13 +297,23 @@
 
     const canvas = document.getElementById('radar');
     const ctx = canvas.getContext('2d');
-    function fitCanvas(){ const dpr = Math.max(1, window.devicePixelRatio || 1); const size = Math.min(window.innerWidth, window.innerHeight) * 0.94; canvas.style.width = size+"px"; canvas.style.height = size+"px"; canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr); ctx.setTransform(dpr,0,0,dpr,0,0); }
+    function fitCanvas(){
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const isPortrait = document.body.classList.contains('portrait');
+      // In portrait: circle is 96vw. In landscape: 98vmin.
+      const size = isPortrait
+        ? window.innerWidth * 0.96
+        : Math.min(window.innerWidth, window.innerHeight) * 0.98;
+      canvas.style.width = size+"px"; canvas.style.height = size+"px";
+      canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
     window.addEventListener('resize', fitCanvas, {passive:true}); fitCanvas();
 
     let map, base, labels, mileCircle, pointsLayer, centerMarker;
     const BASE_URL = 'https://{s}.basemaps.cartocdn.com';
-    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffffff;border:1px solid #6f6;box-shadow:0 0 14px #9f9;filter:drop-shadow(0 0 4px #7CFC00)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
-    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#fff;border:1px solid #4f4;box-shadow:0 0 12px #fff"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
+    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffe040;border:1px solid #00ddff;box-shadow:0 0 14px #ffe040;filter:drop-shadow(0 0 4px #00ddff)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
+    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#00ddff;border:1px solid #fff;box-shadow:0 0 14px #00ddff"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
 
     function ensureMap(lat=42.36077, lng=-71.13457){
       if (map) return;
@@ -233,7 +330,7 @@
       if (centerMarker) centerMarker.remove();
       centerMarker = L.marker([center.lat, center.lng], { icon: new CenterIcon() }).addTo(map);
       if (mileCircle) mileCircle.remove();
-      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#57ff57', weight: 1, fillColor: '#57ff57', fillOpacity: 0.05 }).addTo(map);  // Changed to 1.5 miles
+      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#00ddff', weight: 1.5, fillColor: '#00ddff', fillOpacity: 0.04 }).addTo(map);  // Changed to 1.5 miles
       pointsLayer.clearLayers();
       others.forEach(p => { L.marker([p.lat, p.lng], { icon: new DotIcon() }).addTo(pointsLayer); });
       const bounds = mileCircle.getBounds();
@@ -302,7 +399,7 @@
       ctx.save();
       ctx.beginPath(); ctx.arc(r, r, r-2, 0, Math.PI*2); ctx.clip();
 
-      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(0,0,w,h);
+      ctx.fillStyle = 'rgba(0,8,24,0.30)'; ctx.fillRect(0,0,w,h);
 
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ring');
       ctx.lineWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ring-weight')) || 1.6;
@@ -332,19 +429,22 @@
         const opacity = 0.7 + (1 - distFrac) * 0.3;
         
         ctx.beginPath();
-        ctx.fillStyle = isActive ? '#ffffff' : `rgba(124, 252, 0, ${opacity})`;
+        ctx.fillStyle = isActive ? '#ffe040' : `rgba(255,225,0,${opacity})`;
+        ctx.shadowColor = isActive ? '#ffe040' : 'rgba(0,220,255,0.9)';
+        ctx.shadowBlur = isActive ? 18 : 12;
         ctx.arc(c.x, c.y, size, 0, Math.PI*2); 
         ctx.fill();
+        ctx.shadowBlur = 0;
         
         if (isActive){
           const t = (Date.now()%1000)/1000; const pulse = 11 + Math.sin(t*Math.PI*2)*3.0;
-          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,220,0,0.7)'; ctx.lineWidth = 2.2;
           ctx.arc(c.x, c.y, 13 + pulse, 0, Math.PI*2); ctx.stroke();
         }
       }
 
-      ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.fillStyle = '#00ddff'; ctx.shadowColor='#00ddff'; ctx.shadowBlur=16; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.beginPath(); ctx.strokeStyle = 'rgba(0,220,255,0.7)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
 
       ctx.restore();
     }
@@ -514,6 +614,8 @@
 
     document.getElementById("csvUrlInput").value = STATE.csvUrl;
     applyPreset();
+    applyPortrait();
+    fitCanvas();
     reflectUI();
     refresh();
     } // End initRadar
