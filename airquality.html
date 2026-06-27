@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Air Quality · Microlocal Radar</title>
+  <style>
+    /* ── TOKENS ─────────────────────────────────────────── */
+    :root {
+      --bg:        #00060f;
+      --panel:     rgba(0,12,28,0.92);
+      --cyan:      #00ddff;
+      --yellow:    #ffe040;
+      --text:      #e8f4ff;
+      --muted:     rgba(200,230,255,0.5);
+      --border:    rgba(0,220,255,0.28);
+
+      /* AQI level colors */
+      --good:      #00e676;
+      --moderate:  #ffee58;
+      --sensitive: #ff9800;
+      --unhealthy: #ef5350;
+      --very:      #ab47bc;
+      --hazardous: #b71c1c;
+
+      --aqi-color: var(--good); /* updated dynamically */
+    }
+
+    /* ── RESET ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────── */
+    /* Two rows: big number on top, detail strip on bottom */
+    #app {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      grid-template-columns: 1fr;
+    }
+
+    /* ── TOP: THE NUMBER ────────────────────────────────── */
+    #hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 0 24px;
+      gap: 0;
+    }
+
+    /* Ambient glow behind the number */
+    #hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 55% at 50% 48%, color-mix(in srgb, var(--aqi-color) 14%, transparent), transparent 72%);
+      transition: background 1.4s ease;
+      pointer-events: none;
+    }
+
+    #eyebrow {
+      font-size: clamp(11px, 2.2vw, 15px);
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      z-index: 1;
+    }
+
+    #aqi-number {
+      font-size: clamp(120px, 28vw, 240px);
+      font-weight: 800;
+      line-height: 0.88;
+      letter-spacing: -0.04em;
+      color: var(--aqi-color);
+      text-shadow: 0 0 80px color-mix(in srgb, var(--aqi-color) 55%, transparent),
+                   0 0 20px color-mix(in srgb, var(--aqi-color) 30%, transparent);
+      transition: color 1.4s ease, text-shadow 1.4s ease;
+      z-index: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #aqi-label {
+      margin-top: 14px;
+      font-size: clamp(22px, 5.5vw, 48px);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--aqi-color);
+      opacity: 0.92;
+      transition: color 1.4s ease;
+      z-index: 1;
+    }
+
+    #plain-english {
+      margin-top: 12px;
+      font-size: clamp(14px, 2.8vw, 22px);
+      font-weight: 400;
+      color: var(--text);
+      opacity: 0.72;
+      max-width: 480px;
+      text-align: center;
+      line-height: 1.4;
+      z-index: 1;
+      min-height: 2.8em; /* prevent layout shift */
+    }
+
+    /* ── BOTTOM: DETAIL STRIP ───────────────────────────── */
+    #strip {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 18px 28px 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px 8px;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-size: clamp(20px, 4vw, 32px);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--yellow);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: clamp(9px, 1.6vw, 12px);
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* ── AQI SCALE BAR ──────────────────────────────────── */
+    #scale-row {
+      grid-column: 1 / -1;
+      margin-top: 4px;
+    }
+
+    #scale-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right,
+        var(--good) 0%, var(--good) 20%,
+        var(--moderate) 20%, var(--moderate) 33%,
+        var(--sensitive) 33%, var(--sensitive) 50%,
+        var(--unhealthy) 50%, var(--unhealthy) 66%,
+        var(--very) 66%, var(--very) 83%,
+        var(--hazardous) 83%, var(--hazardous) 100%
+      );
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    #scale-cursor {
+      position: absolute;
+      top: -4px;
+      width: 4px;
+      height: 16px;
+      background: #fff;
+      border-radius: 2px;
+      box-shadow: 0 0 6px rgba(255,255,255,0.8);
+      transform: translateX(-50%);
+      transition: left 1.4s ease;
+    }
+
+    #scale-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: clamp(8px, 1.4vw, 11px);
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    #footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    #sensor-name {
+      font-size: clamp(9px, 1.5vw, 12px);
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    #updated {
+      font-size: clamp(9px, 1.5vw, 12px);
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── SETUP BANNER (shown when no API key configured) ── */
+    #setup-banner {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(255,150,0,0.18);
+      border-top: 1px solid rgba(255,150,0,0.5);
+      color: #ffd080;
+      font-size: 13px;
+      padding: 10px 20px;
+      text-align: center;
+      z-index: 100;
+      display: none;
+    }
+
+    /* ── LOADING / ERROR STATES ─────────────────────────── */
+    #aqi-number.loading { opacity: 0.2; }
+    #aqi-number.error   { font-size: clamp(48px, 10vw, 80px); opacity: 0.5; }
+
+    /* ── PULSE ANIMATION on fresh data ─────────────────── */
+    @keyframes pulse-in {
+      0%   { transform: scale(0.96); opacity: 0.6; }
+      60%  { transform: scale(1.02); }
+      100% { transform: scale(1);    opacity: 1;   }
+    }
+    .pulse { animation: pulse-in 0.5s ease forwards; }
+
+    /* ── REDUCED MOTION ─────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <section id="hero" aria-live="polite" aria-label="Current air quality index">
+    <div id="eyebrow">Air Quality Index · PM 2.5</div>
+    <div id="aqi-number" class="loading">—</div>
+    <div id="aqi-label">Loading…</div>
+    <div id="plain-english"></div>
+  </section>
+
+  <section id="strip">
+    <div class="stat">
+      <div class="stat-value" id="stat-pm25">—</div>
+      <div class="stat-label">PM 2.5 µg/m³</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-pm10">—</div>
+      <div class="stat-label">PM 10 µg/m³</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="stat-humidity">—</div>
+      <div class="stat-label">Humidity %</div>
+    </div>
+
+    <div id="scale-row">
+      <div id="scale-bar">
+        <div id="scale-cursor"></div>
+      </div>
+      <div id="scale-labels">
+        <span>Good</span>
+        <span>Moderate</span>
+        <span>Sensitive</span>
+        <span>Unhealthy</span>
+        <span>Very</span>
+        <span>Hazardous</span>
+      </div>
+    </div>
+
+    <div id="footer">
+      <div id="sensor-name">Microlocal Radar · ABHC</div>
+      <div id="updated">—</div>
+    </div>
+  </section>
+
+</div>
+
+<div id="setup-banner">
+  ⚙️ Demo mode — add your PurpleAir sensor ID and API key to activate live data.
+  See the comment at the top of this file.
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIGURATION — fill these in when you're ready for live data
+//  1. Find your sensor index: go to map.purpleair.com, click your
+//     sensor, look at the URL for ?select=XXXXXX
+//  2. Get a free Read API key at: https://develop.purpleair.com
+// ════════════════════════════════════════════════════════════
+const CONFIG = {
+  SENSOR_ID:  '',           // e.g. '175413'
+  API_KEY:    '',           // e.g. 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX'
+  SENSOR_LABEL: 'Brighton Farmers Market',
+  REFRESH_MS: 2 * 60 * 1000,  // refresh every 2 minutes
+};
+
+// ── URL PARAM OVERRIDES (for testing different sensors) ──────
+// e.g. airquality.html?sensor=175413&key=YOUR-KEY
+const params = new URLSearchParams(location.search);
+if (params.get('sensor')) CONFIG.SENSOR_ID  = params.get('sensor');
+if (params.get('key'))    CONFIG.API_KEY     = params.get('key');
+if (params.get('label'))  CONFIG.SENSOR_LABEL = params.get('label');
+
+// ── DEMO DATA (used when no sensor configured) ───────────────
+const DEMO = {
+  aqi: 42,
+  pm25: 10.4,
+  pm10: 14.2,
+  humidity: 58,
+  sensorName: CONFIG.SENSOR_LABEL + ' (DEMO)',
+};
+
+// ── AQI BREAKPOINTS ──────────────────────────────────────────
+// EPA standard: PM2.5 to AQI
+function pm25toAQI(pm) {
+  const bp = [
+    [0,     12,    0,   50],
+    [12.1,  35.4,  51,  100],
+    [35.5,  55.4,  101, 150],
+    [55.5,  150.4, 151, 200],
+    [150.5, 250.4, 201, 300],
+    [250.5, 500.4, 301, 500],
+  ];
+  for (const [clo, chi, ilo, ihi] of bp) {
+    if (pm >= clo && pm <= chi) {
+      return Math.round(((ihi - ilo) / (chi - clo)) * (pm - clo) + ilo);
+    }
+  }
+  return pm > 500 ? 500 : 0;
+}
+
+const LEVELS = [
+  { max: 50,  label: 'Good',                    color: 'var(--good)',      text: 'Air quality is satisfactory. Perfect conditions for outdoor activities.' },
+  { max: 100, label: 'Moderate',                color: 'var(--moderate)',  text: 'Air quality is acceptable. Very sensitive people may notice minor effects.' },
+  { max: 150, label: 'Unhealthy for Some',      color: 'var(--sensitive)', text: 'Sensitive groups — children, elderly, people with asthma — should limit prolonged outdoor exertion.' },
+  { max: 200, label: 'Unhealthy',               color: 'var(--unhealthy)', text: 'Everyone may experience health effects. Sensitive groups should avoid outdoor exertion.' },
+  { max: 300, label: 'Very Unhealthy',          color: 'var(--very)',      text: 'Health alert: everyone should avoid prolonged outdoor activity.' },
+  { max: 999, label: 'Hazardous',               color: 'var(--hazardous)', text: 'Emergency conditions. Entire population is likely to be affected. Stay indoors.' },
+];
+
+function getLevel(aqi) {
+  return LEVELS.find(l => aqi <= l.max) || LEVELS[LEVELS.length - 1];
+}
+
+// ── DOM REFS ─────────────────────────────────────────────────
+const aqiEl       = document.getElementById('aqi-number');
+const labelEl     = document.getElementById('aqi-label');
+const plainEl     = document.getElementById('plain-english');
+const pm25El      = document.getElementById('stat-pm25');
+const pm10El      = document.getElementById('stat-pm10');
+const humEl       = document.getElementById('stat-humidity');
+const cursorEl    = document.getElementById('scale-cursor');
+const updatedEl   = document.getElementById('updated');
+const sensorEl    = document.getElementById('sensor-name');
+const bannerEl    = document.getElementById('setup-banner');
+const heroEl      = document.getElementById('hero');
+
+// ── RENDER ───────────────────────────────────────────────────
+function render(data) {
+  const { aqi, pm25, pm10, humidity, sensorName } = data;
+  const level = getLevel(aqi);
+
+  // Big number
+  aqiEl.textContent = aqi;
+  aqiEl.classList.remove('loading', 'error');
+  aqiEl.classList.add('pulse');
+  setTimeout(() => aqiEl.classList.remove('pulse'), 600);
+
+  // Color everything
+  document.documentElement.style.setProperty('--aqi-color', level.color);
+
+  labelEl.textContent = level.label;
+  plainEl.textContent = level.text;
+
+  // Stats
+  pm25El.textContent = pm25 != null ? pm25.toFixed(1) : '—';
+  pm10El.textContent = pm10 != null ? pm10.toFixed(1) : '—';
+  humEl.textContent  = humidity != null ? Math.round(humidity) + '%' : '—';
+
+  // Scale cursor: AQI 0–500 → 0–100%
+  const pct = Math.min(100, Math.max(0, (aqi / 500) * 100));
+  cursorEl.style.left = pct + '%';
+
+  // Footer
+  sensorEl.textContent = sensorName || CONFIG.SENSOR_LABEL;
+  updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function showError(msg) {
+  aqiEl.textContent = '!';
+  aqiEl.classList.add('error');
+  labelEl.textContent = 'Data unavailable';
+  plainEl.textContent = msg;
+}
+
+// ── FETCH FROM PURPLEAIR API v1 ──────────────────────────────
+async function fetchLive() {
+  const url = `https://api.purpleair.com/v1/sensors/${CONFIG.SENSOR_ID}`
+    + `?fields=name,pm2.5_10minute,pm10.0,humidity`;
+
+  const res = await fetch(url, {
+    headers: { 'X-API-Key': CONFIG.API_KEY }
+  });
+
+  if (!res.ok) throw new Error(`PurpleAir API ${res.status}`);
+  const json = await res.json();
+
+  // v1 API returns field names + data array
+  const fields = json.sensor;
+  const pm25raw = fields['pm2.5_10minute'] ?? fields['pm2.5'] ?? 0;
+  const pm10    = fields['pm10.0'] ?? null;
+  const humidity = fields['humidity'] ?? null;
+  const name    = fields['name'] || CONFIG.SENSOR_LABEL;
+
+  return {
+    aqi: pm25toAQI(parseFloat(pm25raw)),
+    pm25: parseFloat(pm25raw),
+    pm10: pm10 != null ? parseFloat(pm10) : null,
+    humidity: humidity != null ? parseFloat(humidity) : null,
+    sensorName: name,
+  };
+}
+
+// ── MAIN LOOP ────────────────────────────────────────────────
+async function refresh() {
+  const isConfigured = CONFIG.SENSOR_ID && CONFIG.API_KEY;
+
+  if (!isConfigured) {
+    // Demo mode
+    bannerEl.style.display = 'block';
+    render(DEMO);
+    return;
+  }
+
+  bannerEl.style.display = 'none';
+
+  try {
+    const data = await fetchLive();
+    render(data);
+  } catch (e) {
+    console.error('PurpleAir fetch error:', e);
+    showError('Could not reach sensor — check connection.');
+  }
+}
+
+refresh();
+setInterval(refresh, CONFIG.REFRESH_MS);
+</script>
+</body>
+</html>
