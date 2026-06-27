@@ -73,44 +73,71 @@
     body.portrait #card {
       position: fixed; left: 0; right: 0; bottom: 0;
       width: 100%; max-width: 100%;
-      border-radius: 18px 18px 0 0;
+      border-radius: 0;
       border-left: none; border-right: none; border-bottom: none;
-      border-top: 2px solid rgba(30,100,220,0.65);
-      display: flex; flex-direction: row;
-      height: 38%;
-      box-shadow: 0 -8px 40px rgba(255,198,0,0.18), 0 -4px 18px rgba(0,50,180,0.35);
+      border-top: 2px solid #1e64dc;
+      display: flex; flex-direction: column;
+      height: 40%;
+      box-shadow: 0 -6px 32px rgba(0,30,120,0.60);
     }
 
+    /* Horizontal image across full width, fixed height */
     body.portrait #card .img {
-      width: 42%; flex-shrink: 0; aspect-ratio: unset;
-      height: 100%; border-right: 1px solid rgba(30,100,220,0.30);
+      width: 100%; flex-shrink: 0;
+      height: 52%;
+      aspect-ratio: unset;
+      border-bottom: 1px solid rgba(30,100,220,0.35);
     }
 
+    /* Specimen label below the image */
     body.portrait #card .body {
       flex: 1; display: flex; flex-direction: column; justify-content: center;
-      padding: 16px 18px; border-top: none; overflow: hidden;
+      padding: 8px 16px 10px; border-top: none; overflow: hidden;
+      gap: 3px;
+    }
+
+    /* Eyebrow: location tag in monospace */
+    body.portrait #card .meta {
+      display: block;
+      font-size: clamp(9px, 2.2vw, 12px);
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: #1e64dc;
+      opacity: 1;
+      margin: 0;
     }
 
     body.portrait #card .title {
-      font-size: clamp(16px, 4.5vw, 26px); margin-bottom: 8px; line-height: 1.15;
+      font-size: clamp(15px, 4.2vw, 24px);
+      margin: 0; line-height: 1.15;
+      color: #ffc600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     body.portrait #card .desc {
-      font-size: clamp(13px, 3.2vw, 18px); opacity: 0.88; line-height: 1.35;
-      display: -webkit-box; -webkit-line-clamp: 4;
+      font-size: clamp(11px, 2.8vw, 15px); opacity: 0.82; line-height: 1.3;
+      color: #aac4ff;
+      display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; overflow: hidden;
-    }
-
-    body.portrait #card .meta {
-      display: block; margin-top: 10px;
-      font-size: clamp(11px, 2.8vw, 15px);
-      font-family: 'Courier New', monospace;
-      color: rgba(30,100,220,0.9); opacity: 1;
+      margin: 0;
     }
 
     body.portrait #panel,
     body.portrait #status,
     body.portrait #debug { display: none !important; }
+
+    /* Shrink Leaflet attribution in portrait — legally required but needn't dominate */
+    body.portrait .leaflet-control-attribution {
+      font-size: 8px !important;
+      opacity: 0.45 !important;
+      background: transparent !important;
+      color: #aac4ff !important;
+      padding: 1px 4px !important;
+    }
+    body.portrait .leaflet-control-attribution a { color: #aac4ff !important; }
   </style>
 </head>
 <body>
@@ -130,9 +157,9 @@
   <div id="card" aria-live="polite">
     <div class="img"><div class="placeholder">Image from sheet will appear here</div></div>
     <div class="body">
+      <div class="meta" id="meta"></div>
       <div class="title">Loading…</div>
       <div class="desc">Please wait</div>
-      <div class="meta" id="meta"></div>
     </div>
   </div>
   <div id="status">Loading…</div>
@@ -489,6 +516,16 @@
     function setCard(p){
       titleEl.textContent = p.name || 'Untitled';
       descEl.textContent = p.notes || '';
+
+      // Specimen eyebrow: location name + coords if available
+      const metaEl = document.getElementById('meta');
+      if (metaEl && center) {
+        const lat = p.lat ? p.lat.toFixed(4) + '° N' : '';
+        const lng = p.lng ? Math.abs(p.lng).toFixed(4) + '° W' : '';
+        const coords = (lat && lng) ? `${lat}  ${lng}` : '';
+        metaEl.textContent = coords || 'Allston-Brighton';
+      }
+
       imgWrap.innerHTML='';
       if (p.image){
         const img=new Image(); img.alt=p.name||''; img.decoding='async'; img.loading='eager';
