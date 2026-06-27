@@ -9,50 +9,50 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root{
-      --ring: rgba(0,220,255,0.65);
-      --sweepA: rgba(255,230,0,0.08);
-      --sweepB: rgba(255,220,0,0.72);
-      --text: #fffbe0;
-      --glass: rgba(0,10,30,0.72);
-      --border: rgba(0,220,255,0.45);
-      --map-filter: grayscale(0.2) contrast(1.1) brightness(1.05) saturate(1.2);
-      --map-opacity: 0.78;
+      --ring: rgba(30,100,220,0.75);
+      --sweepA: rgba(255,198,0,0.07);
+      --sweepB: rgba(255,198,0,0.68);
+      --text: #e8eeff;
+      --glass: rgba(0,8,40,0.80);
+      --border: rgba(30,100,220,0.45);
+      --map-filter: grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg);
+      --map-opacity: 0.72;
       --dot-size: 10px;
       --dot-size-active: 14px;
       --ring-weight: 2.5;
       --sweep-width-deg: 26;
     }
-    html, body { margin:0; height:100%; background:#000; overflow:hidden; user-select:none; touch-action:none; }
+    html, body { margin:0; height:100%; background:#000818; overflow:hidden; user-select:none; touch-action:none; }
     #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
     #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
     #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
-    canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 52px rgba(255,220,0,0.45), 0 0 18px rgba(0,220,255,0.30); display:block; }
+    canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 52px rgba(255,198,0,0.40), 0 0 22px rgba(0,50,180,0.50); display:block; }
 
-    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:#ffe040; background:rgba(0,10,30,0.80); border:1px solid rgba(0,220,255,0.55); border-radius:12px; padding:6px 12px; font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; letter-spacing:0.04em; }
+    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:#ffc600; background:rgba(0,8,48,0.88); border:1px solid rgba(30,100,220,0.60); border-radius:12px; padding:6px 12px; font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; letter-spacing:0.04em; }
 
     #panel { position: fixed; top: 10px; left: 10px; z-index: 50; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
     .chip { padding:6px 10px; border-radius: 12px; font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; cursor:pointer; user-select:none; }
     .chip.toggle { background:#baffbf; color:#003300; border:1px solid #77ff88; }
     .chip.bold   { background:#ffe9bd; color:#3a2400; border:1px solid #ffd27a; }
-    .chip.input  { background:rgba(255,255,255,0.08); color:#cfe; border:1px solid var(--border); padding:0 0; }
-    .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#cfe; font: 11px 'Courier New', monospace; }
+    .chip.input  { background:rgba(255,255,255,0.08); color:#aac4ff; border:1px solid var(--border); padding:0 0; }
+    .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#aac4ff; font: 11px 'Courier New', monospace; }
     .chip.small  { font-size: 11px; padding: 5px 8px; }
 
-    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#cff; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,10,30,.75); padding:6px 10px; border-radius:10px; border:1px solid rgba(0,220,255,0.4); z-index: 40; }
+    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#aac4ff; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,8,48,.82); padding:6px 10px; border-radius:10px; border:1px solid rgba(30,100,220,0.45); z-index: 40; }
 
-    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: rgba(0,10,30,0.88); color: #fffbe0; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid rgba(0,220,255,0.5); border-radius: 14px; overflow: hidden; box-shadow: 0 0 28px rgba(255,220,0,0.25), 0 0 10px rgba(0,220,255,0.20); pointer-events: none; z-index: 30; }
-    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,10,30,0.6); display:grid; place-items:center; overflow:hidden; }
+    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: rgba(0,8,48,0.92); color: #e8eeff; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid rgba(30,100,220,0.55); border-radius: 14px; overflow: hidden; box-shadow: 0 0 28px rgba(255,198,0,0.22), 0 0 12px rgba(0,50,180,0.40); pointer-events: none; z-index: 30; }
+    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,8,48,0.6); display:grid; place-items:center; overflow:hidden; }
     #card .img img { width:100%; height:100%; object-fit: cover; display:block; }
     #card .img .placeholder { font-size: 13px; opacity: .8; padding: 12px; text-align:center; }
-    #card .body { padding: 10px 12px 12px; border-top: 1px solid rgba(0,220,255,0.25); }
-    #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: #ffe040; }
-    #card .desc { font-size: 13px; opacity: .9; color: #cff; }
+    #card .body { padding: 10px 12px 12px; border-top: 1px solid rgba(30,100,220,0.30); }
+    #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: #ffc600; }
+    #card .desc { font-size: 13px; opacity: .9; color: #aac4ff; }
     #card .meta { margin-top: 8px; font-size: 12px; opacity: .8; min-height: 1.2em; display:none; }
 
-    #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#bfffbf; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
+    #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#aac4ff; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
 
     /* ── PORTRAIT / SHORTS MODE ─────────────────────────────────────────── */
-    body.portrait { background: #00060f; }
+    body.portrait { background: #000818; }
 
     body.portrait #map { bottom: 40%; }
 
@@ -63,7 +63,7 @@
 
     body.portrait canvas {
       width: 96vw; height: 96vw;
-      box-shadow: 0 0 64px rgba(255,220,0,0.50), 0 0 22px rgba(0,220,255,0.35);
+      box-shadow: 0 0 64px rgba(255,198,0,0.48), 0 0 24px rgba(0,50,180,0.55);
     }
 
     body.portrait #titleStrip {
@@ -75,15 +75,15 @@
       width: 100%; max-width: 100%;
       border-radius: 18px 18px 0 0;
       border-left: none; border-right: none; border-bottom: none;
-      border-top: 2px solid rgba(0,220,255,0.6);
+      border-top: 2px solid rgba(30,100,220,0.65);
       display: flex; flex-direction: row;
       height: 38%;
-      box-shadow: 0 -8px 40px rgba(255,220,0,0.20), 0 -4px 18px rgba(0,220,255,0.18);
+      box-shadow: 0 -8px 40px rgba(255,198,0,0.18), 0 -4px 18px rgba(0,50,180,0.35);
     }
 
     body.portrait #card .img {
       width: 42%; flex-shrink: 0; aspect-ratio: unset;
-      height: 100%; border-right: 1px solid rgba(0,220,255,0.25);
+      height: 100%; border-right: 1px solid rgba(30,100,220,0.30);
     }
 
     body.portrait #card .body {
@@ -105,7 +105,7 @@
       display: block; margin-top: 10px;
       font-size: clamp(11px, 2.8vw, 15px);
       font-family: 'Courier New', monospace;
-      color: rgba(0,220,255,0.8); opacity: 1;
+      color: rgba(30,100,220,0.9); opacity: 1;
     }
 
     body.portrait #panel,
@@ -142,13 +142,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Wait for Leaflet to be fully loaded
     window.addEventListener('load', function() {
       initRadar();
     });
     
     function initRadar() {
-    // --- CONFIG ---
     let KIOSK_MODE = false;
 
     const DEFAULTS = {
@@ -160,7 +158,6 @@
     const STATE = loadState();
     function loadState(){
       try{ 
-        // Clear old cache and force new URL
         localStorage.removeItem("microlocal-v10-1");
         return {...DEFAULTS}; 
       }
@@ -186,15 +183,14 @@
     function applyPortrait() {
       if (PORTRAIT_MODE) {
         document.body.classList.add('portrait');
-        KIOSK_MODE = true;  // Portrait always hides controls
+        KIOSK_MODE = true;
       } else {
         document.body.classList.remove('portrait');
       }
     }
 
-    // Re-check on resize (e.g. rotating device)
     window.addEventListener('resize', () => {
-      if (PORTRAIT_PARAM === null) {  // Only auto-detect if not forced via URL
+      if (PORTRAIT_PARAM === null) {
         PORTRAIT_MODE = window.innerHeight > window.innerWidth;
       }
       applyPortrait();
@@ -205,16 +201,16 @@
     applyPortrait();
 
     function applyPreset(){
-      document.documentElement.style.setProperty("--map-filter", "grayscale(0.2) contrast(1.1) brightness(1.05) saturate(1.2)");
-      document.documentElement.style.setProperty("--map-opacity", 0.78);
+      document.documentElement.style.setProperty("--map-filter", "grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg)");
+      document.documentElement.style.setProperty("--map-opacity", 0.72);
       document.documentElement.style.setProperty("--ring-weight", 2.5);
       document.documentElement.style.setProperty("--dot-size", "10px");
       document.documentElement.style.setProperty("--dot-size-active", "14px");
       document.documentElement.style.setProperty("--sweep-width-deg", 26);
     }
 
-    const FIXED_RADIUS_MILES = 1.5;  // Zoomed in for hyperlocal cluster of locations
-    const JITTER_DEG         = 8.0;  // Moderate jitter for visual spread
+    const FIXED_RADIUS_MILES = 1.5;
+    const JITTER_DEG         = 8.0;
     const DECLUMP_MIN_PX     = 16;
 
     const toggleDemo  = document.getElementById("toggleDemo");
@@ -236,13 +232,11 @@
       debugToggle.textContent = "Debug: " + (showDebug ? "ON" : "OFF");
       applyPreset();
       if (KIOSK_MODE){
-        // Hide ALL controls in kiosk mode (use 'K' key to exit)
         panelEl.style.display = "none";
         debugEl.style.display = "none";
         if (zoomOutBtn) { zoomOutBtn.style.display='none'; zoomInBtn.style.display='none'; zoomResetBtn.style.display='none'; }
         setTimeout(()=>{ statusEl.style.display = "none"; }, 4000);
       } else {
-        // Show all controls
         panelEl.style.display = "flex";
         debugEl.style.display = showDebug ? "block" : "none";
         if (zoomOutBtn) { zoomOutBtn.style.display=''; zoomInBtn.style.display=''; zoomResetBtn.style.display=''; }
@@ -256,14 +250,13 @@
     kioskToggle.addEventListener("click", () => { KIOSK_MODE = !KIOSK_MODE; reflectUI(); });
     debugToggle.addEventListener("click", () => { showDebug = !showDebug; reflectUI(); });
 
-    // Keyboard shortcut: Press 'K' to toggle kiosk mode
     document.addEventListener("keydown", (e) => {
       if (e.key === 'k' || e.key === 'K') {
         KIOSK_MODE = !KIOSK_MODE;
         reflectUI();
       }
     });
-    // Zoom controls
+
     let zoomLevel = 100;
     const ZOOM_STEPS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200];
     const zoomOutBtn  = document.getElementById('zoomOut');
@@ -286,8 +279,6 @@
       zoomLevel = 100; applyZoom();
     });
 
-
-
     const toRad = d => d * Math.PI / 180;
     const toDeg = r => r * 180 / Math.PI;
     const EARTH_MILES = 3958.7613;
@@ -300,7 +291,6 @@
     function fitCanvas(){
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const isPortrait = document.body.classList.contains('portrait');
-      // In portrait: circle is 96vw. In landscape: 98vmin.
       const size = isPortrait
         ? window.innerWidth * 0.96
         : Math.min(window.innerWidth, window.innerHeight) * 0.98;
@@ -312,8 +302,8 @@
 
     let map, base, labels, mileCircle, pointsLayer, centerMarker;
     const BASE_URL = 'https://{s}.basemaps.cartocdn.com';
-    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffe040;border:1px solid #00ddff;box-shadow:0 0 14px #ffe040;filter:drop-shadow(0 0 4px #00ddff)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
-    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#00ddff;border:1px solid #fff;box-shadow:0 0 14px #00ddff"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
+    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffc600;border:1px solid #1e64dc;box-shadow:0 0 14px #ffc600;filter:drop-shadow(0 0 4px #1e64dc)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
+    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#1e64dc;border:1px solid #fff;box-shadow:0 0 14px #1e64dc"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
 
     function ensureMap(lat=42.36077, lng=-71.13457){
       if (map) return;
@@ -321,7 +311,7 @@
       base = L.tileLayer(BASE_URL + "/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }).addTo(map);
       labels = L.tileLayer(BASE_URL + "/light_only_labels/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', opacity: 0.58 }).addTo(map);
       pointsLayer = L.layerGroup().addTo(map);
-      map.setView([lat, lng], 17);  // Increased zoom from 15 to 17
+      map.setView([lat, lng], 17);
       setTimeout(() => map.invalidateSize(), 50);
     }
 
@@ -330,12 +320,12 @@
       if (centerMarker) centerMarker.remove();
       centerMarker = L.marker([center.lat, center.lng], { icon: new CenterIcon() }).addTo(map);
       if (mileCircle) mileCircle.remove();
-      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#00ddff', weight: 1.5, fillColor: '#00ddff', fillOpacity: 0.04 }).addTo(map);  // Changed to 1.5 miles
+      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#1e64dc', weight: 1.5, fillColor: '#1e64dc', fillOpacity: 0.04 }).addTo(map);
       pointsLayer.clearLayers();
       others.forEach(p => { L.marker([p.lat, p.lng], { icon: new DotIcon() }).addTo(pointsLayer); });
       const bounds = mileCircle.getBounds();
-      map.fitBounds(bounds.pad(0.15), { animate: false });  // Increased padding slightly from 0.12 to 0.15
-      map.setMaxBounds(bounds.pad(0.30));  // Increased from 0.25 to 0.30
+      map.fitBounds(bounds.pad(0.15), { animate: false });
+      map.setMaxBounds(bounds.pad(0.30));
       setTimeout(() => map.invalidateSize(), 50);
     }
 
@@ -352,17 +342,15 @@
       const frac = Math.min(1, d / FIXED_RADIUS_MILES);
       const e = exaggerate(frac);
       const seed = (p.name||'') + '|' + p.lat + '|' + p.lng;
-      // Use geographic bearing with jitter for spread
       const jitter = (stableRand(seed) - 0.5) * (JITTER_DEG * 2);
       const angle = (b - 90 + jitter) * Math.PI/180;
       const rad = e * R;
-      
       return { x: (w/2) + Math.cos(angle) * rad, y: (w/2) + Math.sin(angle) * rad, distance: d };
     }
 
     function resolveOverlap(coords, cx, cy, maxR, minSep = DECLUMP_MIN_PX){
       if (!STATE.declump || coords.length < 2) return coords;
-      const iters = 30;  // Reduced iterations
+      const iters = 30;
       for (let k = 0; k < iters; k++){
         let moved = false;
         for (let i = 0; i < coords.length; i++){
@@ -371,7 +359,7 @@
             const dx = b.x - a.x, dy = b.y - a.y;
             let d = Math.hypot(dx, dy) || 0.0001;
             if (d < minSep){
-              const push = (minSep - d) / 2.5;  // Gentler push
+              const push = (minSep - d) / 2.5;
               const ux = dx / d, uy = dy / d;
               a.x -= ux * push; a.y -= uy * push;
               b.x += ux * push; b.y += uy * push;
@@ -399,13 +387,16 @@
       ctx.save();
       ctx.beginPath(); ctx.arc(r, r, r-2, 0, Math.PI*2); ctx.clip();
 
-      ctx.fillStyle = 'rgba(0,8,24,0.30)'; ctx.fillRect(0,0,w,h);
+      // Deep navy background inside the circle
+      ctx.fillStyle = 'rgba(0,6,32,0.45)'; ctx.fillRect(0,0,w,h);
 
+      // Rings in marathon blue
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ring');
       ctx.lineWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ring-weight')) || 1.6;
       for(let i=1;i<=4;i++){ ctx.beginPath(); ctx.arc(r, r, (r-14)*(i/4), 0, Math.PI*2); ctx.stroke(); }
       ctx.beginPath(); ctx.moveTo(r,12); ctx.lineTo(r,h-12); ctx.moveTo(12,r); ctx.lineTo(w-12,r); ctx.stroke();
 
+      // Sweep in gold
       const grad = ctx.createRadialGradient(r,r,0,r,r,r);
       grad.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--sweepA'));
       grad.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--sweepB'));
@@ -425,12 +416,12 @@
         const activeSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-size-active')) || 9;
         const distanceScale = 1.4 - (distFrac * 0.6);
         const size = (isActive ? activeSize : baseSize) * distanceScale;
-        
         const opacity = 0.7 + (1 - distFrac) * 0.3;
         
+        // Gold dots, glow in marathon blue
         ctx.beginPath();
-        ctx.fillStyle = isActive ? '#ffe040' : `rgba(255,225,0,${opacity})`;
-        ctx.shadowColor = isActive ? '#ffe040' : 'rgba(0,220,255,0.9)';
+        ctx.fillStyle = isActive ? '#ffc600' : `rgba(255,198,0,${opacity})`;
+        ctx.shadowColor = isActive ? '#ffc600' : 'rgba(30,100,220,0.9)';
         ctx.shadowBlur = isActive ? 18 : 12;
         ctx.arc(c.x, c.y, size, 0, Math.PI*2); 
         ctx.fill();
@@ -438,33 +429,24 @@
         
         if (isActive){
           const t = (Date.now()%1000)/1000; const pulse = 11 + Math.sin(t*Math.PI*2)*3.0;
-          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,220,0,0.7)'; ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,198,0,0.7)'; ctx.lineWidth = 2.2;
           ctx.arc(c.x, c.y, 13 + pulse, 0, Math.PI*2); ctx.stroke();
         }
       }
 
-      ctx.beginPath(); ctx.fillStyle = '#00ddff'; ctx.shadowColor='#00ddff'; ctx.shadowBlur=16; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(0,220,255,0.7)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
+      // Center dot in marathon blue
+      ctx.beginPath(); ctx.fillStyle = '#1e64dc'; ctx.shadowColor='#1e64dc'; ctx.shadowBlur=16; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.beginPath(); ctx.strokeStyle = 'rgba(30,100,220,0.8)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
 
       ctx.restore();
     }
 
     async function loadCSVOnce(url){
       return new Promise((resolve, reject) => {
-        console.log("Attempting to load CSV from:", url);
         Papa.parse(url, { 
-          download: true, 
-          header: true, 
-          skipEmptyLines: true,
-          complete: (res) => {
-            console.log("CSV loaded successfully:", res.data.length, "rows");
-            console.log("First row:", res.data[0]);
-            resolve(res.data);
-          }, 
-          error: (err) => {
-            console.error("CSV load error:", err);
-            reject(err);
-          } 
+          download: true, header: true, skipEmptyLines: true,
+          complete: (res) => { resolve(res.data); }, 
+          error: (err) => { reject(err); } 
         });
       });
     }
@@ -528,17 +510,9 @@
       try{
         statusEl2.textContent = 'Loading…';
         const liveUrl = (STATE.csvUrl || "").trim();
-        console.log("=== REFRESH START ===");
-        console.log("Demo mode:", STATE.useDemo);
-        console.log("CSV URL:", liveUrl);
-        
         const csvUrl = STATE.useDemo ? null : (liveUrl ? liveUrl + (liveUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null);
         const raw = STATE.useDemo ? DEMO_ROWS : await loadCSVOnce(csvUrl);
-        
-        console.log("Raw data rows:", raw.length);
         const normalized = raw.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
-        console.log("Valid normalized rows:", normalized.length);
-        
         const centerRow = chooseCenter(normalized);
         const others = normalized.filter(r => r !== centerRow);
 
@@ -550,13 +524,11 @@
 
         window.center = center = centerRow;
         window.points = points = others;
-
         updateMapLayers(center, points);
 
         const timeStr = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         statusEl2.textContent = `${points.length} places • Center: ${center?(center.name||'—'):'—'} • ${(STATE.useDemo?'DEMO':'LIVE')} • Updated ${timeStr}`;
         
-        // Enhanced debug info
         const debugLines = [`CENTER: "${center.name||'—'}" @ ${center.lat?.toFixed(5)}, ${center.lng?.toFixed(5)}`];
         points.forEach((p, i) => {
           const d = haversineMiles(center, p);
@@ -568,10 +540,7 @@
         if(points.length) setCard(points[0]);
         draw();
       }catch(e){
-        console.error("=== REFRESH ERROR ===");
-        console.error(e);
         statusEl2.textContent = 'Load error. Check CSV URL / publish settings. Using DEMO data.';
-        // Fallback to demo on error
         const normalized = DEMO_ROWS.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
         const centerRow = chooseCenter(normalized);
         const others = normalized.filter(r => r !== centerRow);
