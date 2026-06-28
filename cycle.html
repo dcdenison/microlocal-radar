@@ -15,7 +15,6 @@
       overflow: hidden;
     }
 
-    /* Two iframes stacked in the same cell; only one is visible at a time */
     #slot-a, #slot-b {
       position: fixed;
       inset: 0;
@@ -29,74 +28,163 @@
     #slot-a { z-index: 1; opacity: 1; }
     #slot-b { z-index: 2; opacity: 0; }
 
-    /* During a cross-fade, slot-b rises to full opacity */
-    #slot-b.visible { opacity: 1; }
+    /* ── PAGE INDICATOR DOTS ── */
+    #dots {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 99;
+      pointer-events: none;
+    }
 
-    /* After the fade completes, swap z-index so slot-a is on top again next cycle */
-    #slot-a.under { z-index: 1; }
-    #slot-b.on-top { z-index: 2; }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: rgba(30,100,220,0.35);
+      border: 1px solid rgba(30,100,220,0.6);
+      transition: background 0.4s ease, transform 0.4s ease;
+    }
+
+    .dot.active {
+      background: #ffc600;
+      border-color: #ffc600;
+      transform: scale(1.35);
+      box-shadow: 0 0 6px #ffc600;
+    }
+
+    /* ── PROGRESS BAR ── */
+    #progress {
+      position: fixed;
+      bottom: 0; left: 0;
+      height: 3px;
+      width: 0%;
+      background: #1e64dc;
+      z-index: 99;
+      transition: none;
+    }
+
+    #progress.running {
+      transition: width linear;
+    }
   </style>
 </head>
 <body>
 
   <iframe id="slot-a" src="" allowfullscreen></iframe>
   <iframe id="slot-b" src="" allowfullscreen></iframe>
+  <div id="dots"></div>
+  <div id="progress"></div>
 
   <script>
-  // ── CONFIGURATION ──────────────────────────────────────────────────────────
-  // Add or remove page filenames here. Order determines the cycle sequence.
-  // Timing is in milliseconds (30000 = 30 seconds).
-  // You can override via URL params:
-  //   cycle.html?pages=index,airquality&seconds=45
-  // ──────────────────────────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════
+  //  PLAYLIST — edit this list to add / remove / reorder pages.
+  //
+  //  Each entry is either:
+  //    'filename.html'           — a page in this same repo
+  //    'https://...'             — a full URL (must allow iframes)
+  //
+  //  To set a custom hold time for one page, use object form:
+  //    { url: 'airquality.html', seconds: 20 }
+  //    { url: 'index.html',      seconds: 45 }
+  //
+  //  Default hold time (used when not specified per-page):
+  //  Change DEFAULT_SECONDS below.
+  // ══════════════════════════════════════════════════════════════
 
-  const DEFAULT_PAGES   = ['index.html', 'airquality.html'];
   const DEFAULT_SECONDS = 30;
-  const FADE_MS         = 1200; // must match CSS transition duration
 
-  // ── URL PARAM OVERRIDES ───────────────────────────────────────────────────
-  const params  = new URLSearchParams(location.search);
-  const PAGES   = params.get('pages')
-    ? params.get('pages').split(',').map(p => p.trim()).filter(Boolean)
-    : DEFAULT_PAGES;
-  const HOLD_MS = (parseFloat(params.get('seconds')) || DEFAULT_SECONDS) * 1000;
+  const PLAYLIST = [
+    { url: 'index.html',      seconds: 40 },
+    { url: 'airquality.html', seconds: 20 },
+    // { url: 'weather.html',    seconds: 30 },
+    // { url: 'samples.html',    seconds: 30 },
+    // { url: 'https://placemakingreport.com/some-page', seconds: 30 },
+  ];
 
-  // ── STATE ─────────────────────────────────────────────────────────────────
-  const slotA = document.getElementById('slot-a');
-  const slotB = document.getElementById('slot-b');
+  // ── URL PARAM OVERRIDES ───────────────────────────────────────
+  // cycle.html?pages=index.html,airquality.html&seconds=45
+  const params = new URLSearchParams(location.search);
+  if (params.get('pages')) {
+    const overrideSeconds = parseFloat(params.get('seconds')) || DEFAULT_SECONDS;
+    PLAYLIST.length = 0;
+    params.get('pages').split(',').map(p => p.trim()).filter(Boolean)
+      .forEach(url => PLAYLIST.push({ url, seconds: overrideSeconds }));
+  }
 
-  let currentIndex = 0;  // which page is currently showing
+  // Normalize all entries to objects
+  const PAGES = PLAYLIST.map(p =>
+    typeof p === 'string'
+      ? { url: p, seconds: DEFAULT_SECONDS }
+      : { url: p.url, seconds: p.seconds ?? DEFAULT_SECONDS }
+  );
+
+  const FADE_MS = 1200;
+
+  // ── DOM ───────────────────────────────────────────────────────
+  const slotA    = document.getElementById('slot-a');
+  const slotB    = document.getElementById('slot-b');
+  const dotsEl   = document.getElementById('dots');
+  const progressEl = document.getElementById('progress');
+
+  // ── BUILD DOTS ────────────────────────────────────────────────
+  PAGES.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.id = 'dot-' + i;
+    dotsEl.appendChild(d);
+  });
+
+  function setActiveDot(index) {
+    document.querySelectorAll('.dot').forEach((d, i) => {
+      d.classList.toggle('active', i === index);
+    });
+  }
+
+  // ── PROGRESS BAR ─────────────────────────────────────────────
+  function runProgress(durationMs) {
+    progressEl.style.transition = 'none';
+    progressEl.style.width = '0%';
+    // Force reflow
+    void progressEl.offsetWidth;
+    progressEl.classList.add('running');
+    progressEl.style.transitionDuration = durationMs + 'ms';
+    progressEl.style.width = '100%';
+  }
+
+  // ── STATE ─────────────────────────────────────────────────────
+  let currentIndex = 0;
   let nextIndex    = 1 % PAGES.length;
-  let aIsTop       = false; // tracks which slot is the visible one
+  let aIsTop       = true;
+  let cycleTimer   = null;
 
-  // ── BOOT: load first page into slot-a immediately ─────────────────────────
-  slotA.src = PAGES[0];
+  // ── BOOT ──────────────────────────────────────────────────────
+  slotA.src          = PAGES[0].url;
   slotA.style.opacity = '1';
   slotA.style.zIndex  = '2';
   slotB.style.opacity = '0';
   slotB.style.zIndex  = '1';
-  aIsTop = true;
 
-  // Pre-load the second page into slot-b while first page is showing
   if (PAGES.length > 1) {
-    slotB.src = PAGES[nextIndex];
+    slotB.src = PAGES[nextIndex].url;
   }
 
-  // ── CYCLE ─────────────────────────────────────────────────────────────────
+  runProgress(PAGES[0].seconds * 1000);
+  scheduleNext(PAGES[0].seconds * 1000);
+
+  // ── CYCLE ─────────────────────────────────────────────────────
   function cycle() {
-    if (PAGES.length < 2) return; // nothing to cycle
+    if (PAGES.length < 2) return;
 
     const incoming = aIsTop ? slotB : slotA;
     const outgoing = aIsTop ? slotA : slotB;
 
-    // Make sure the incoming slot has the right page loaded
-    incoming.src = PAGES[nextIndex];
-
-    // Bring incoming slot above outgoing and fade it in
+    incoming.src           = PAGES[nextIndex].url;
     incoming.style.zIndex  = '3';
     outgoing.style.zIndex  = '2';
 
-    // Small rAF delay so the browser paints the z-index change before fading
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         incoming.style.opacity = '1';
@@ -104,7 +192,6 @@
       });
     });
 
-    // After fade completes, clean up z-index and advance indices
     setTimeout(() => {
       outgoing.style.zIndex = '1';
       incoming.style.zIndex = '2';
@@ -113,15 +200,19 @@
       currentIndex = nextIndex;
       nextIndex    = (nextIndex + 1) % PAGES.length;
 
-      // Pre-load the page after next into the slot that just went under
-      outgoing.src = PAGES[nextIndex];
+      outgoing.src = PAGES[nextIndex].url;
+
+      setActiveDot(currentIndex);
+      const holdMs = PAGES[currentIndex].seconds * 1000;
+      runProgress(holdMs);
+      scheduleNext(holdMs);
 
     }, FADE_MS + 50);
   }
 
-  // Start cycling after the first hold period
-  if (PAGES.length > 1) {
-    setInterval(cycle, HOLD_MS);
+  function scheduleNext(ms) {
+    clearTimeout(cycleTimer);
+    cycleTimer = setTimeout(cycle, ms);
   }
   </script>
 </body>
