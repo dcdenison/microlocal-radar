@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Microlocal Radar · Cycle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000818;
+      overflow: hidden;
+    }
+
+    /* Two iframes stacked in the same cell; only one is visible at a time */
+    #slot-a, #slot-b {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000818;
+      transition: opacity 1.2s ease;
+    }
+
+    #slot-a { z-index: 1; opacity: 1; }
+    #slot-b { z-index: 2; opacity: 0; }
+
+    /* During a cross-fade, slot-b rises to full opacity */
+    #slot-b.visible { opacity: 1; }
+
+    /* After the fade completes, swap z-index so slot-a is on top again next cycle */
+    #slot-a.under { z-index: 1; }
+    #slot-b.on-top { z-index: 2; }
+  </style>
+</head>
+<body>
+
+  <iframe id="slot-a" src="" allowfullscreen></iframe>
+  <iframe id="slot-b" src="" allowfullscreen></iframe>
+
+  <script>
+  // ── CONFIGURATION ──────────────────────────────────────────────────────────
+  // Add or remove page filenames here. Order determines the cycle sequence.
+  // Timing is in milliseconds (30000 = 30 seconds).
+  // You can override via URL params:
+  //   cycle.html?pages=index,airquality&seconds=45
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const DEFAULT_PAGES   = ['index.html', 'airquality.html'];
+  const DEFAULT_SECONDS = 30;
+  const FADE_MS         = 1200; // must match CSS transition duration
+
+  // ── URL PARAM OVERRIDES ───────────────────────────────────────────────────
+  const params  = new URLSearchParams(location.search);
+  const PAGES   = params.get('pages')
+    ? params.get('pages').split(',').map(p => p.trim()).filter(Boolean)
+    : DEFAULT_PAGES;
+  const HOLD_MS = (parseFloat(params.get('seconds')) || DEFAULT_SECONDS) * 1000;
+
+  // ── STATE ─────────────────────────────────────────────────────────────────
+  const slotA = document.getElementById('slot-a');
+  const slotB = document.getElementById('slot-b');
+
+  let currentIndex = 0;  // which page is currently showing
+  let nextIndex    = 1 % PAGES.length;
+  let aIsTop       = false; // tracks which slot is the visible one
+
+  // ── BOOT: load first page into slot-a immediately ─────────────────────────
+  slotA.src = PAGES[0];
+  slotA.style.opacity = '1';
+  slotA.style.zIndex  = '2';
+  slotB.style.opacity = '0';
+  slotB.style.zIndex  = '1';
+  aIsTop = true;
+
+  // Pre-load the second page into slot-b while first page is showing
+  if (PAGES.length > 1) {
+    slotB.src = PAGES[nextIndex];
+  }
+
+  // ── CYCLE ─────────────────────────────────────────────────────────────────
+  function cycle() {
+    if (PAGES.length < 2) return; // nothing to cycle
+
+    const incoming = aIsTop ? slotB : slotA;
+    const outgoing = aIsTop ? slotA : slotB;
+
+    // Make sure the incoming slot has the right page loaded
+    incoming.src = PAGES[nextIndex];
+
+    // Bring incoming slot above outgoing and fade it in
+    incoming.style.zIndex  = '3';
+    outgoing.style.zIndex  = '2';
+
+    // Small rAF delay so the browser paints the z-index change before fading
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        incoming.style.opacity = '1';
+        outgoing.style.opacity = '0';
+      });
+    });
+
+    // After fade completes, clean up z-index and advance indices
+    setTimeout(() => {
+      outgoing.style.zIndex = '1';
+      incoming.style.zIndex = '2';
+      aIsTop = !aIsTop;
+
+      currentIndex = nextIndex;
+      nextIndex    = (nextIndex + 1) % PAGES.length;
+
+      // Pre-load the page after next into the slot that just went under
+      outgoing.src = PAGES[nextIndex];
+
+    }, FADE_MS + 50);
+  }
+
+  // Start cycling after the first hold period
+  if (PAGES.length > 1) {
+    setInterval(cycle, HOLD_MS);
+  }
+  </script>
+</body>
+</html>
