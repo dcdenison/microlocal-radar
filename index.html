@@ -318,9 +318,14 @@
     function fitCanvas(){
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const isPortrait = document.body.classList.contains('portrait');
-      const size = isPortrait
-        ? window.innerWidth * 0.96
-        : Math.min(window.innerWidth, window.innerHeight) * 0.98;
+      let size;
+      if (isPortrait) {
+        const availW = window.innerWidth * 0.96;
+        const availH = window.innerHeight * 0.60 * 0.92; // stage is top 60% of screen, leave a little breathing room
+        size = Math.min(availW, availH);
+      } else {
+        size = Math.min(window.innerWidth, window.innerHeight) * 0.98;
+      }
       canvas.style.width = size+"px"; canvas.style.height = size+"px";
       canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
       ctx.setTransform(dpr,0,0,dpr,0,0);
