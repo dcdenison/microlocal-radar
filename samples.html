@@ -1,1 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Samples · Placemaking Report</title>
+<style>
+  /* ── PPM DESIGN SPEC v1 ─────────────────────────────
+     bg #000000 · text #ffffff · accent #f2ff00
+     Courier New only · 2px borders · no radius/shadow/glow
+  ──────────────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #000000;
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── FIXED HEADER ──────────────────────────────────── */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    background: #000000;
+    border-bottom: 2px solid #f2ff00;
+    padding: 14px 18px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  #header .masthead {
+    color: #f2ff00;
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #header .count {
+    color: rgba(255,255,255,0.75);
+    font-size: clamp(10px, 2vw, 12px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── SCROLLING LEDGER ──────────────────────────────── */
+  #viewport {
+    position: fixed;
+    top: 52px; bottom: 0; left: 0; right: 0;
+    overflow: hidden;
+  }
+
+  #ledger {
+    padding: 18px 18px 0;
+  }
+
+  .entry {
+    border: 2px solid #f2ff00;
+    margin-bottom: 22px;
+    padding: 16px 16px 14px;
+    background: #000000;
+  }
+
+  .eyebrow {
+    color: #f2ff00;
+    font-size: clamp(10px, 2.2vw, 12px);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-bottom: 12px;
+  }
+
+  .rule {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.35);
+    margin: 12px 0;
+  }
+
+  .entry .name {
+    color: #f2ff00;
+    font-size: clamp(18px, 4.5vw, 26px);
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1.12;
+    margin-bottom: 8px;
+  }
+
+  .entry .notes {
+    color: #ffffff;
+    font-size: clamp(12px, 2.8vw, 14px);
+    line-height: 1.5;
+  }
+
+  .entry .photo {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin-top: 12px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background-size: cover;
+    background-position: center;
+    filter: grayscale(1) contrast(1.1);
+  }
+
+  /* ── FOOTER LINE (end of loop marker) ──────────────── */
+  .loop-mark {
+    color: rgba(255,255,255,0.75);
+    font-size: 11px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 10px 0 26px;
+  }
+
+  /* ── STATUS (loading / error) ──────────────────────── */
+  #status {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    z-index: 5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Auto-scroll is the page's function on a kiosk; it continues,
+       but with no other motion present nothing else animates. */
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="masthead">Placemaking Report · Samples</div>
+  <div class="count" id="count">—</div>
+</div>
+
+<div id="status">Loading samples…</div>
+
+<div id="viewport">
+  <div id="ledger"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+// ── CONFIGURATION ──────────────────────────────────────
+// Same Google Sheet CSV that feeds the radar (index.html).
+// One spreadsheet powers both pages.
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ9tkXhhRDZyHIHrfiLg41w-NIOgDL8oS6fez0yVmBY9tJfBWDIRJ0a4hLrELvAWM1RZSxYDM09Yfg/pub?gid=632827062&single=true&output=csv";
+
+const SCROLL_PX_PER_SEC = 22;   // drift speed — lower = slower
+const START_DELAY_MS    = 2500; // pause before scrolling begins
+
+// ── FIELD HELPERS (same logic as the radar) ────────────
+function pickField(obj, names, regexes = []) {
+  for (const key of Object.keys(obj)) {
+    if (names.some(n => n.toLowerCase() === String(key).trim().toLowerCase())) return obj[key];
+  }
+  for (const key of Object.keys(obj)) {
+    if (regexes.some(rx => rx.test(String(key)))) return obj[key];
+  }
+  return undefined;
+}
+function toNum(v) {
+  const n = parseFloat(String(v ?? "").replace(/[^\d.+-]/g, "").trim());
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function normalizeRow(row) {
+  return {
+    name:  pickField(row, ["name","title","place"], [/(name|title|place)/i]),
+    lat:   toNum(pickField(row, ["lat","latitude"], [/(lat|latitude)/i])),
+    lng:   toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i])),
+    notes: pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]),
+    image: pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
+  };
+}
+
+// ── BUILD ONE LEDGER ENTRY ─────────────────────────────
+function entryHTML(sample, index) {
+  const num = String(index + 1).padStart(3, "0");
+  const lat = Number.isFinite(sample.lat) ? sample.lat.toFixed(4) + "° N" : "";
+  const lng = Number.isFinite(sample.lng) ? Math.abs(sample.lng).toFixed(4) + "° W" : "";
+  const coords = (lat && lng) ? `${lat}&nbsp; ${lng}` : "";
+
+  const photo = sample.image
+    ? `<div class="photo" style="background-image:url('${String(sample.image).replace(/'/g, "%27")}')"></div>`
+    : "";
+
+  return `
+    <div class="entry">
+      <div class="eyebrow"><span>Sample № ${num}</span><span>${coords}</span></div>
+      <hr class="rule" />
+      <div class="name">${sample.name || "Untitled"}</div>
+      <div class="notes">${sample.notes || ""}</div>
+      ${photo}
+    </div>`;
+}
+
+// ── LOAD + RENDER ──────────────────────────────────────
+const ledgerEl = document.getElementById("ledger");
+const statusEl = document.getElementById("status");
+const countEl  = document.getElementById("count");
+
+Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: (res) => {
+    const samples = res.data
+      .map(normalizeRow)
+      .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+    if (!samples.length) {
+      statusEl.textContent = "No samples found — check sheet.";
+      return;
+    }
+
+    statusEl.style.display = "none";
+    countEl.textContent = samples.length + " logged";
+
+    const listHTML = samples.map(entryHTML).join("")
+      + `<div class="loop-mark">· · · Archive repeats · · ·</div>`;
+
+    // Duplicate the list once so the loop is seamless
+    ledgerEl.innerHTML = listHTML + listHTML;
+
+    startScroll();
+  },
+  error: () => {
+    statusEl.textContent = "Load error — check CSV URL.";
+  }
+});
+
+// ── AUTO-SCROLL LOOP ───────────────────────────────────
+const viewport = document.getElementById("viewport");
+
+function startScroll() {
+  // If everything fits on screen, no need to scroll
+  const halfHeight = ledgerEl.scrollHeight / 2;
+  if (halfHeight <= viewport.clientHeight) return;
+
+  let pos = 0;
+  let last = null;
+
+  function step(ts) {
+    if (last === null) last = ts;
+    const dt = (ts - last) / 1000;
+    last = ts;
+
+    pos += SCROLL_PX_PER_SEC * dt;
+    if (pos >= halfHeight) pos -= halfHeight; // seamless wrap
+
+    viewport.scrollTop = pos;
+    requestAnimationFrame(step);
+  }
+
+  setTimeout(() => requestAnimationFrame(step), START_DELAY_MS);
+}
+</script>
+</body>
+</html>
 
