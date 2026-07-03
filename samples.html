@@ -159,7 +159,9 @@
 <script>
 // ── CONFIGURATION ──────────────────────────────────────
 // Same Google Sheet CSV that feeds the radar (index.html).
-// One spreadsheet powers both pages.
+// One spreadsheet powers both pages. Sample numbers here
+// match the numbers shown on the radar's card and active dot:
+// both pages number by sheet row order.
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ9tkXhhRDZyHIHrfiLg41w-NIOgDL8oS6fez0yVmBY9tJfBWDIRJ0a4hLrELvAWM1RZSxYDM09Yfg/pub?gid=632827062&single=true&output=csv";
 
 const SCROLL_PX_PER_SEC = 22;   // drift speed — lower = slower
@@ -179,14 +181,19 @@ function toNum(v) {
   const n = parseFloat(String(v ?? "").replace(/[^\d.+-]/g, "").trim());
   return Number.isFinite(n) ? n : NaN;
 }
+function truthy(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  return ['1','true','yes','y','t'].includes(s);
+}
 
 function normalizeRow(row) {
   return {
-    name:  pickField(row, ["name","title","place"], [/(name|title|place)/i]),
-    lat:   toNum(pickField(row, ["lat","latitude"], [/(lat|latitude)/i])),
-    lng:   toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i])),
-    notes: pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]),
-    image: pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
+    name:      pickField(row, ["name","title","place"], [/(name|title|place)/i]),
+    lat:       toNum(pickField(row, ["lat","latitude"], [/(lat|latitude)/i])),
+    lng:       toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i])),
+    notes:     pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]),
+    image:     pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
+    is_center: truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i])),
   };
 }
 
@@ -197,13 +204,18 @@ function entryHTML(sample, index) {
   const lng = Number.isFinite(sample.lng) ? Math.abs(sample.lng).toFixed(4) + "° W" : "";
   const coords = (lat && lng) ? `${lat}&nbsp; ${lng}` : "";
 
+  // The center row is the PPM's own location — labeled BASE
+  const label = sample.is_center
+    ? `Sample № ${num} · Base`
+    : `Sample № ${num}`;
+
   const photo = sample.image
     ? `<div class="photo" style="background-image:url('${String(sample.image).replace(/'/g, "%27")}')"></div>`
     : "";
 
   return `
     <div class="entry">
-      <div class="eyebrow"><span>Sample № ${num}</span><span>${coords}</span></div>
+      <div class="eyebrow"><span>${label}</span><span>${coords}</span></div>
       <hr class="rule" />
       <div class="name">${sample.name || "Untitled"}</div>
       <div class="notes">${sample.notes || ""}</div>
@@ -274,4 +286,3 @@ function startScroll() {
 </script>
 </body>
 </html>
-
