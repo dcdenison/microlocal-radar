@@ -45,42 +45,34 @@
     white-space: nowrap;
   }
 
-  #header .count {
+  #header .counter {
     color: rgba(255,255,255,0.75);
     font-size: clamp(10px, 2vw, 12px);
     letter-spacing: 0.14em;
     text-transform: uppercase;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* ── SCROLLING LEDGER ──────────────────────────────── */
-  #viewport {
+  /* ── SLIDE AREA ────────────────────────────────────── */
+  #slide {
     position: fixed;
     top: 52px; bottom: 0; left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
     overflow: hidden;
-  }
-
-  #ledger {
-    padding: 18px 18px 0;
-  }
-
-  .entry {
-    border: 2px solid #f2ff00;
-    margin-bottom: 22px;
-    padding: 16px 16px 14px;
-    background: #000000;
   }
 
   .eyebrow {
     color: #f2ff00;
-    font-size: clamp(10px, 2.2vw, 12px);
+    font-size: clamp(10px, 2.4vw, 13px);
     letter-spacing: 0.16em;
     text-transform: uppercase;
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 4px 12px;
-    margin-bottom: 12px;
   }
 
   .rule {
@@ -89,39 +81,70 @@
     margin: 12px 0;
   }
 
-  .entry .name {
+  .name {
     color: #f2ff00;
-    font-size: clamp(18px, 4.5vw, 26px);
+    font-size: clamp(24px, 7vw, 44px);
     font-weight: 700;
     text-transform: uppercase;
-    line-height: 1.12;
-    margin-bottom: 8px;
+    line-height: 1.08;
+    margin-bottom: 10px;
   }
 
-  .entry .notes {
+  .notes {
     color: #ffffff;
-    font-size: clamp(12px, 2.8vw, 14px);
+    font-size: clamp(13px, 3.2vw, 17px);
     line-height: 1.5;
   }
 
-  .entry .photo {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    margin-top: 12px;
-    border: 1px solid rgba(255,255,255,0.35);
+  /* ── SIGNIFICANCE LIST ─────────────────────────────── */
+  .sig-label {
+    color: rgba(255,255,255,0.75);
+    font-size: clamp(9px, 2.2vw, 12px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 16px 0 6px;
+  }
+
+  .sig-list {
+    list-style: none;
+  }
+
+  .sig-list li {
+    color: #ffffff;
+    font-size: clamp(13px, 3.2vw, 17px);
+    line-height: 1.45;
+    padding-left: 24px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .sig-list li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: #f2ff00;
+  }
+
+  /* ── PHOTO (fills remaining space) ─────────────────── */
+  .photo {
+    flex: 1;
+    min-height: 0;
+    margin-top: 16px;
+    border: 2px solid #f2ff00;
     background-size: cover;
     background-position: center;
     filter: grayscale(1) contrast(1.1);
   }
 
-  /* ── FOOTER LINE (end of loop marker) ──────────────── */
-  .loop-mark {
+  .photo.empty {
+    border: 1px solid rgba(255,255,255,0.35);
+    display: grid;
+    place-items: center;
     color: rgba(255,255,255,0.75);
-    font-size: 11px;
-    letter-spacing: 0.20em;
+    font-size: 12px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-align: center;
-    padding: 10px 0 26px;
+    filter: none;
   }
 
   /* ── STATUS (loading / error) ──────────────────────── */
@@ -135,37 +158,37 @@
     text-transform: uppercase;
     z-index: 5;
   }
-
-  @media (prefers-reduced-motion: reduce) {
-    /* Auto-scroll is the page's function on a kiosk; it continues,
-       but with no other motion present nothing else animates. */
-  }
 </style>
 </head>
 <body>
 
 <div id="header">
   <div class="masthead">Placemaking Report · Samples</div>
-  <div class="count" id="count">—</div>
+  <div class="counter" id="counter">—</div>
 </div>
 
 <div id="status">Loading samples…</div>
 
-<div id="viewport">
-  <div id="ledger"></div>
-</div>
+<div id="slide"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
 // ── CONFIGURATION ──────────────────────────────────────
 // Same Google Sheet CSV that feeds the radar (index.html).
-// One spreadsheet powers both pages. Sample numbers here
-// match the numbers shown on the radar's card and active dot:
+// Sample numbers match the radar's card and active dot —
 // both pages number by sheet row order.
+//
+// "features" column: separate items with semicolons, or one
+// per line inside the cell. Rows without features show no list.
+//
+// Hold time per sample: default below, or override in the URL:
+//   samples.html?hold=6
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ9tkXhhRDZyHIHrfiLg41w-NIOgDL8oS6fez0yVmBY9tJfBWDIRJ0a4hLrELvAWM1RZSxYDM09Yfg/pub?gid=632827062&single=true&output=csv";
 
-const SCROLL_PX_PER_SEC = 22;   // drift speed — lower = slower
-const START_DELAY_MS    = 2500; // pause before scrolling begins
+const DEFAULT_HOLD_SECONDS = 8;
+
+const params  = new URLSearchParams(location.search);
+const HOLD_MS = (parseFloat(params.get('hold')) || DEFAULT_HOLD_SECONDS) * 1000;
 
 // ── FIELD HELPERS (same logic as the radar) ────────────
 function pickField(obj, names, regexes = []) {
@@ -193,47 +216,85 @@ function normalizeRow(row) {
     lng:       toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i])),
     notes:     pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]),
     image:     pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
+    features:  pickField(row, ["features","significance","highlights"], [/(features?|significance|highlights?)/i]),
     is_center: truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i])),
   };
 }
 
-// ── BUILD ONE LEDGER ENTRY ─────────────────────────────
-function entryHTML(sample, index) {
+// ── PARSE FEATURES CELL ────────────────────────────────
+function parseFeatures(raw) {
+  if (!raw) return [];
+  return String(raw)
+    .split(/[;\n\r]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// ── BUILD ONE FULL-SCREEN SLIDE ────────────────────────
+function slideHTML(sample, index) {
   const num = String(index + 1).padStart(3, "0");
   const lat = Number.isFinite(sample.lat) ? sample.lat.toFixed(4) + "° N" : "";
   const lng = Number.isFinite(sample.lng) ? Math.abs(sample.lng).toFixed(4) + "° W" : "";
   const coords = (lat && lng) ? `${lat}&nbsp; ${lng}` : "";
 
-  // The center row is the PPM's own location — labeled BASE
   const label = sample.is_center
     ? `Sample № ${num} · Base`
     : `Sample № ${num}`;
 
-  const photo = sample.image
-    ? `<div class="photo" style="background-image:url('${String(sample.image).replace(/'/g, "%27")}')"></div>`
+  const feats = parseFeatures(sample.features);
+  const sigHTML = feats.length
+    ? `<div class="sig-label">Significance</div>
+       <ul class="sig-list">${feats.map(f => `<li>${esc(f)}</li>`).join("")}</ul>`
     : "";
 
+  const photoHTML = sample.image
+    ? `<div class="photo" style="background-image:url('${String(sample.image).replace(/'/g, "%27")}')"></div>`
+    : `<div class="photo empty">No image on file</div>`;
+
   return `
-    <div class="entry">
-      <div class="eyebrow"><span>${label}</span><span>${coords}</span></div>
-      <hr class="rule" />
-      <div class="name">${sample.name || "Untitled"}</div>
-      <div class="notes">${sample.notes || ""}</div>
-      ${photo}
-    </div>`;
+    <div class="eyebrow"><span>${label}</span><span>${coords}</span></div>
+    <hr class="rule" />
+    <div class="name">${esc(sample.name) || "Untitled"}</div>
+    <div class="notes">${esc(sample.notes)}</div>
+    ${sigHTML}
+    ${photoHTML}`;
 }
 
-// ── LOAD + RENDER ──────────────────────────────────────
-const ledgerEl = document.getElementById("ledger");
-const statusEl = document.getElementById("status");
-const countEl  = document.getElementById("count");
+// ── LOAD + RUN SEQUENCE ────────────────────────────────
+const slideEl   = document.getElementById("slide");
+const statusEl  = document.getElementById("status");
+const counterEl = document.getElementById("counter");
+
+let samples = [];
+let current = 0;
+
+function showSlide(i) {
+  const s = samples[i];
+  slideEl.innerHTML = slideHTML(s, i);
+  counterEl.textContent =
+    String(i + 1).padStart(3, "0") + " / " + String(samples.length).padStart(3, "0");
+
+  // Pre-load the next sample's photo so the cut is instant
+  const next = samples[(i + 1) % samples.length];
+  if (next && next.image) {
+    const pre = new Image();
+    pre.src = next.image;
+  }
+}
 
 Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
   download: true,
   header: true,
   skipEmptyLines: true,
   complete: (res) => {
-    const samples = res.data
+    samples = res.data
       .map(normalizeRow)
       .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
 
@@ -243,46 +304,19 @@ Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
     }
 
     statusEl.style.display = "none";
-    countEl.textContent = samples.length + " logged";
+    showSlide(0);
 
-    const listHTML = samples.map(entryHTML).join("")
-      + `<div class="loop-mark">· · · Archive repeats · · ·</div>`;
-
-    // Duplicate the list once so the loop is seamless
-    ledgerEl.innerHTML = listHTML + listHTML;
-
-    startScroll();
+    if (samples.length > 1) {
+      setInterval(() => {
+        current = (current + 1) % samples.length;
+        showSlide(current);
+      }, HOLD_MS);
+    }
   },
   error: () => {
     statusEl.textContent = "Load error — check CSV URL.";
   }
 });
-
-// ── AUTO-SCROLL LOOP ───────────────────────────────────
-const viewport = document.getElementById("viewport");
-
-function startScroll() {
-  // If everything fits on screen, no need to scroll
-  const halfHeight = ledgerEl.scrollHeight / 2;
-  if (halfHeight <= viewport.clientHeight) return;
-
-  let pos = 0;
-  let last = null;
-
-  function step(ts) {
-    if (last === null) last = ts;
-    const dt = (ts - last) / 1000;
-    last = ts;
-
-    pos += SCROLL_PX_PER_SEC * dt;
-    if (pos >= halfHeight) pos -= halfHeight; // seamless wrap
-
-    viewport.scrollTop = pos;
-    requestAnimationFrame(step);
-  }
-
-  setTimeout(() => requestAnimationFrame(step), START_DELAY_MS);
-}
 </script>
 </body>
 </html>
