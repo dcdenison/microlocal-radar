@@ -9,14 +9,14 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root{
-      --ring: rgba(30,100,220,0.85);
+      --ring: rgba(30,100,220,0.75);
       --sweepA: rgba(255,198,0,0.07);
       --sweepB: rgba(255,198,0,0.68);
       --text: #e8eeff;
       --glass: rgba(0,8,40,0.80);
       --border: rgba(30,100,220,0.45);
-      --map-filter: grayscale(1) contrast(1.25) brightness(0.55);
-      --map-opacity: 0.82;
+      --map-filter: grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg);
+      --map-opacity: 0.72;
       --dot-size: 10px;
       --dot-size-active: 14px;
       --ring-weight: 2.5;
@@ -41,12 +41,13 @@
     #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#aac4ff; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,8,48,.82); padding:6px 10px; border-radius:10px; border:1px solid rgba(30,100,220,0.45); z-index: 40; }
 
     #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: rgba(0,8,48,0.92); color: #e8eeff; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid rgba(30,100,220,0.55); border-radius: 14px; overflow: hidden; box-shadow: 0 0 28px rgba(255,198,0,0.22), 0 0 12px rgba(0,50,180,0.40); pointer-events: none; z-index: 30; }
-    #card .img { width: 100%; aspect-ratio: 16/9; background-color: rgba(0,8,48,0.6); background-size: cover; background-position: center; background-repeat: no-repeat; overflow:hidden; }
+    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,8,48,0.6); display:grid; place-items:center; overflow:hidden; }
+    #card .img img { width:100%; height:100%; object-fit: cover; display:block; }
     #card .img .placeholder { font-size: 13px; opacity: .8; padding: 12px; text-align:center; }
     #card .body { padding: 10px 12px 12px; border-top: 1px solid rgba(30,100,220,0.30); }
     #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: #ffc600; }
     #card .desc { font-size: 13px; opacity: .9; color: #aac4ff; }
-    #card .meta { margin-top: 8px; font-size: 12px; opacity: .8; min-height: 1.2em; display:none; }
+    #card .meta { margin: 0 0 6px; font-size: 11px; font-family: 'Courier New', monospace; letter-spacing: 0.10em; text-transform: uppercase; color: #1e64dc; opacity: 1; min-height: 1.2em; display: block; }
 
     #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#aac4ff; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
 
@@ -61,6 +62,7 @@
     }
 
     body.portrait canvas {
+      width: 96vw; height: 96vw;
       box-shadow: 0 0 64px rgba(255,198,0,0.48), 0 0 24px rgba(0,50,180,0.55);
     }
 
@@ -226,8 +228,8 @@
     applyPortrait();
 
     function applyPreset(){
-      document.documentElement.style.setProperty("--map-filter", "grayscale(1) contrast(1.25) brightness(0.55)");
-      document.documentElement.style.setProperty("--map-opacity", 0.82);
+      document.documentElement.style.setProperty("--map-filter", "grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg)");
+      document.documentElement.style.setProperty("--map-opacity", 0.72);
       document.documentElement.style.setProperty("--ring-weight", 2.5);
       document.documentElement.style.setProperty("--dot-size", "10px");
       document.documentElement.style.setProperty("--dot-size-active", "14px");
@@ -316,14 +318,9 @@
     function fitCanvas(){
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const isPortrait = document.body.classList.contains('portrait');
-      let size;
-      if (isPortrait) {
-        const availW = window.innerWidth * 0.96;
-        const availH = window.innerHeight * 0.60 * 0.92; // stage is top 60% of screen, leave a little breathing room
-        size = Math.min(availW, availH);
-      } else {
-        size = Math.min(window.innerWidth, window.innerHeight) * 0.98;
-      }
+      const size = isPortrait
+        ? window.innerWidth * 0.96
+        : Math.min(window.innerWidth, window.innerHeight) * 0.98;
       canvas.style.width = size+"px"; canvas.style.height = size+"px";
       canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
       ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -461,6 +458,25 @@
           const t = (Date.now()%1000)/1000; const pulse = 11 + Math.sin(t*Math.PI*2)*3.0;
           ctx.beginPath(); ctx.strokeStyle = 'rgba(255,198,0,0.7)'; ctx.lineWidth = 2.2;
           ctx.arc(c.x, c.y, 13 + pulse, 0, Math.PI*2); ctx.stroke();
+
+          // Sample number beside the active dot — the link to the Samples ledger
+          const activePoint = points[c.i];
+          if (activePoint && activePoint.num){
+            const numLabel = '№' + String(activePoint.num).padStart(3,'0');
+            ctx.font = '700 13px "Courier New", monospace';
+            ctx.fillStyle = '#ffc600';
+            ctx.shadowColor = 'rgba(0,8,24,0.9)';
+            ctx.shadowBlur = 6;
+            if (c.x > r){
+              ctx.textAlign = 'right';
+              ctx.fillText(numLabel, c.x - 20, c.y - 16);
+            } else {
+              ctx.textAlign = 'left';
+              ctx.fillText(numLabel, c.x + 20, c.y - 16);
+            }
+            ctx.shadowBlur = 0;
+            ctx.textAlign = 'left';
+          }
         }
       }
 
@@ -520,27 +536,31 @@
       titleEl.textContent = p.name || 'Untitled';
       descEl.textContent = p.notes || '';
 
-      // Specimen eyebrow: location name + coords if available
+      // Specimen eyebrow: sample number + coordinates
+      // The number matches this place's entry in samples.html —
+      // both pages number by sheet row order.
       const metaEl = document.getElementById('meta');
-      if (metaEl && center) {
+      if (metaEl) {
+        const numStr = p.num ? 'Sample № ' + String(p.num).padStart(3,'0') : '';
         const lat = p.lat ? p.lat.toFixed(4) + '° N' : '';
         const lng = p.lng ? Math.abs(p.lng).toFixed(4) + '° W' : '';
         const coords = (lat && lng) ? `${lat}  ${lng}` : '';
-        metaEl.textContent = coords || 'Allston-Brighton';
+        const parts = [numStr, coords || 'Allston-Brighton'].filter(Boolean);
+        metaEl.textContent = parts.join('  ·  ');
       }
 
-      const fallbackSVG = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
-
-      imgWrap.innerHTML = '';
-      imgWrap.style.backgroundSize = 'cover';
+      imgWrap.innerHTML='';
       if (p.image){
-        const preload = new Image();
-        preload.onload = () => { imgWrap.style.backgroundImage = `url("${p.image}")`; };
-        preload.onerror = () => { imgWrap.style.backgroundSize = 'contain'; imgWrap.style.backgroundImage = `url("${fallbackSVG}")`; };
-        preload.src = p.image;
+        const img=new Image(); img.alt=p.name||''; img.decoding='async'; img.loading='eager';
+        img.onload=()=>{ imgWrap.innerHTML=''; imgWrap.appendChild(img); };
+        img.onerror=()=>{
+          const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+          imgWrap.innerHTML=''; imgWrap.appendChild(f);
+        };
+        img.src=p.image;
       } else {
-        imgWrap.style.backgroundSize = 'contain';
-        imgWrap.style.backgroundImage = `url("${fallbackSVG}")`;
+        const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+        imgWrap.innerHTML=''; imgWrap.appendChild(f);
       }
     }
 
@@ -553,6 +573,8 @@
         const csvUrl = STATE.useDemo ? null : (liveUrl ? liveUrl + (liveUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null);
         const raw = STATE.useDemo ? DEMO_ROWS : await loadCSVOnce(csvUrl);
         const normalized = raw.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        // Assign sample numbers by sheet row order — same rule as samples.html
+        normalized.forEach((r, i) => { r.num = i + 1; });
         const centerRow = chooseCenter(normalized);
         const others = normalized.filter(r => r !== centerRow);
 
@@ -573,7 +595,7 @@
         points.forEach((p, i) => {
           const d = haversineMiles(center, p);
           const b = bearingDeg(center, p);
-          debugLines.push(`${i+1}. ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
+          debugLines.push(`№${String(p.num).padStart(3,'0')} ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
         });
         debugEl.innerHTML = debugLines.join('<br>');
 
@@ -582,6 +604,7 @@
       }catch(e){
         statusEl2.textContent = 'Load error. Check CSV URL / publish settings. Using DEMO data.';
         const normalized = DEMO_ROWS.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        normalized.forEach((r, i) => { r.num = i + 1; });
         const centerRow = chooseCenter(normalized);
         const others = normalized.filter(r => r !== centerRow);
         if (centerRow) {
@@ -592,7 +615,7 @@
           points.forEach((p, i) => {
             const d = haversineMiles(center, p);
             const b = bearingDeg(center, p);
-            debugLines.push(`${i+1}. ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
+            debugLines.push(`№${String(p.num).padStart(3,'0')} ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
           });
           debugEl.innerHTML = debugLines.join('<br>');
           if(points.length) setCard(points[0]);
