@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Weather · Microlocal Radar</title>
+  <style>
+    /* ── SPEC C TOKENS ──────────────────────────────────── */
+    :root {
+      --bg:     #000000;
+      --text:   #ffffff;
+      --accent: #f2ff00;
+      --border: #ffffff;
+      --dim:    #999999;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #app {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      grid-template-columns: 1fr;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────── */
+    #header {
+      padding: 20px 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 14px;
+    }
+    #eyebrow {
+      font-size: clamp(11px, 2vw, 14px);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    #station-label {
+      font-size: clamp(10px, 1.6vw, 12px);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    /* ── HERO: OUTDOOR TEMP ─────────────────────────────── */
+    #hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px;
+      text-align: center;
+    }
+
+    #temp-label {
+      font-size: clamp(11px, 2vw, 14px);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+
+    #temp-number {
+      font-size: clamp(120px, 26vw, 220px);
+      font-weight: 700;
+      line-height: 0.9;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #temp-number.loading { color: var(--dim); }
+
+    #condition-line {
+      margin-top: 10px;
+      font-size: clamp(15px, 3vw, 24px);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text);
+    }
+
+    #feels-like {
+      margin-top: 6px;
+      font-size: clamp(12px, 2.2vw, 16px);
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── STAT GRID ──────────────────────────────────────── */
+    #strip {
+      border-top: 2px solid var(--border);
+      padding: 18px 24px 22px;
+    }
+
+    #outdoor-grid, #indoor-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+
+    #indoor-grid { grid-template-columns: repeat(3, 1fr); margin-top: 16px; }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 4px;
+      border-left: 2px solid var(--border);
+    }
+    .stat:first-child { border-left: none; }
+
+    .stat-value {
+      font-size: clamp(18px, 3.4vw, 28px);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: clamp(8px, 1.4vw, 11px);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--dim);
+      text-align: center;
+    }
+
+    #section-divider {
+      margin-top: 16px;
+      font-size: clamp(9px, 1.5vw, 11px);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--dim);
+      border-top: 2px solid var(--border);
+      padding-top: 10px;
+    }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    #footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 2px solid var(--border);
+    }
+
+    #sensor-name, #updated {
+      font-size: clamp(9px, 1.4vw, 11px);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    /* ── SETUP BANNER (demo mode) ───────────────────────── */
+    #setup-banner {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--accent);
+      color: var(--bg);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 20px;
+      text-align: center;
+      z-index: 100;
+      display: none;
+      border-top: 2px solid var(--border);
+    }
+
+    #aqi-number.error { font-size: clamp(48px, 10vw, 80px); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div id="eyebrow">Weather Station · Outdoor</div>
+    <div id="station-label" id="station-label">Loading…</div>
+  </div>
+
+  <section id="hero" aria-live="polite" aria-label="Current outdoor conditions">
+    <div id="temp-label">Outdoor Temp</div>
+    <div id="temp-number" class="loading">—</div>
+    <div id="condition-line">Loading…</div>
+    <div id="feels-like"></div>
+  </section>
+
+  <section id="strip">
+    <div id="outdoor-grid">
+      <div class="stat">
+        <div class="stat-value" id="stat-humidity">—</div>
+        <div class="stat-label">Humidity %</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-wind">—</div>
+        <div class="stat-label">Wind MPH</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-uv">—</div>
+        <div class="stat-label">UV Index</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-rain">—</div>
+        <div class="stat-label">Rain Today IN</div>
+      </div>
+    </div>
+
+    <div id="section-divider">Indoor</div>
+
+    <div id="indoor-grid">
+      <div class="stat">
+        <div class="stat-value" id="stat-temp-in">—</div>
+        <div class="stat-label">Indoor Temp °F</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-humidity-in">—</div>
+        <div class="stat-label">Indoor Humidity %</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-pressure">—</div>
+        <div class="stat-label">Pressure InHg</div>
+      </div>
+    </div>
+
+    <div id="footer">
+      <div id="sensor-name">Microlocal Radar · ABHC</div>
+      <div id="updated">—</div>
+    </div>
+  </section>
+
+</div>
+
+<div id="setup-banner">
+  Demo mode — add your Ambient Weather MAC address, API key, and application key to activate live data.
+  See the comment at the top of this file.
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIGURATION — fill these in when the station is on the network
+//  1. Log in at ambientweather.net, go to your device, copy the MAC address.
+//  2. Get keys at: https://ambientweather.net/account (API Keys tab)
+//     You need BOTH an API key and an application key.
+// ════════════════════════════════════════════════════════════
+const CONFIG = {
+  MAC_ADDRESS: '',      // e.g. '00:11:22:33:44:55'
+  API_KEY:     '',      // your personal API key
+  APP_KEY:     '',      // your application key
+  STATION_LABEL: 'PPM Weather Station',
+  REFRESH_MS: 2 * 60 * 1000,  // refresh every 2 minutes
+};
+
+// ── URL PARAM OVERRIDES (for testing) ─────────────────────────
+// e.g. weather.html?mac=00:11:22:33:44:55&key=YOUR-API-KEY&app=YOUR-APP-KEY
+const params = new URLSearchParams(location.search);
+if (params.get('mac'))   CONFIG.MAC_ADDRESS  = params.get('mac');
+if (params.get('key'))   CONFIG.API_KEY      = params.get('key');
+if (params.get('app'))   CONFIG.APP_KEY      = params.get('app');
+if (params.get('label')) CONFIG.STATION_LABEL = params.get('label');
+
+// ── DEMO DATA (used when no station configured) ───────────────
+const DEMO = {
+  tempOut: 74,
+  condition: 'Partly Cloudy',
+  feelsLike: 76,
+  humidity: 58,
+  windSpeed: 6,
+  uv: 4,
+  rainToday: 0.02,
+  tempIn: 71,
+  humidityIn: 44,
+  pressure: 29.94,
+  stationName: CONFIG.STATION_LABEL + ' (DEMO)',
+};
+
+// ── CONDITION TEXT FROM SOLAR RADIATION / UV (rough heuristic) ─
+function guessCondition(solarRadiation, rainRate) {
+  if (rainRate && rainRate > 0) return 'Raining';
+  if (solarRadiation == null) return '—';
+  if (solarRadiation < 50) return 'Overcast';
+  if (solarRadiation < 300) return 'Partly Cloudy';
+  return 'Clear';
+}
+
+// ── DOM REFS ────────────────────────────────────────────────
+const tempEl        = document.getElementById('temp-number');
+const conditionEl    = document.getElementById('condition-line');
+const feelsEl        = document.getElementById('feels-like');
+const humEl          = document.getElementById('stat-humidity');
+const windEl         = document.getElementById('stat-wind');
+const uvEl           = document.getElementById('stat-uv');
+const rainEl         = document.getElementById('stat-rain');
+const tempInEl       = document.getElementById('stat-temp-in');
+const humInEl        = document.getElementById('stat-humidity-in');
+const pressureEl     = document.getElementById('stat-pressure');
+const stationLabelEl = document.getElementById('station-label');
+const sensorNameEl   = document.getElementById('sensor-name');
+const updatedEl      = document.getElementById('updated');
+const bannerEl       = document.getElementById('setup-banner');
+
+// ── RENDER ──────────────────────────────────────────────────
+function render(data) {
+  tempEl.textContent = Math.round(data.tempOut);
+  tempEl.classList.remove('loading');
+
+  conditionEl.textContent = data.condition || '—';
+  feelsEl.textContent = data.feelsLike != null ? `Feels Like ${Math.round(data.feelsLike)}°` : '';
+
+  humEl.textContent = data.humidity != null ? Math.round(data.humidity) : '—';
+  windEl.textContent = data.windSpeed != null ? data.windSpeed.toFixed(1) : '—';
+  uvEl.textContent = data.uv != null ? data.uv : '—';
+  rainEl.textContent = data.rainToday != null ? data.rainToday.toFixed(2) : '—';
+
+  tempInEl.textContent = data.tempIn != null ? Math.round(data.tempIn) : '—';
+  humInEl.textContent = data.humidityIn != null ? Math.round(data.humidityIn) : '—';
+  pressureEl.textContent = data.pressure != null ? data.pressure.toFixed(2) : '—';
+
+  stationLabelEl.textContent = data.stationName || CONFIG.STATION_LABEL;
+  sensorNameEl.textContent = 'Microlocal Radar · ' + (data.stationName || CONFIG.STATION_LABEL);
+  updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function showError(msg) {
+  tempEl.textContent = '!';
+  tempEl.classList.add('loading');
+  conditionEl.textContent = 'Data unavailable';
+  feelsEl.textContent = msg;
+}
+
+// ── FETCH FROM AMBIENT WEATHER API v1 ───────────────────────
+async function fetchLive() {
+  const url = `https://api.ambientweather.net/v1/devices/${CONFIG.MAC_ADDRESS}`
+    + `?apiKey=${CONFIG.API_KEY}&applicationKey=${CONFIG.APP_KEY}&limit=1`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Ambient Weather API ${res.status}`);
+  const json = await res.json();
+  const reading = Array.isArray(json) ? json[0] : json;
+  if (!reading) throw new Error('No data returned');
+
+  return {
+    tempOut: reading.tempf,
+    condition: guessCondition(reading.solarradiation, reading.hourlyrainin),
+    feelsLike: reading.feelsLike ?? reading.tempf,
+    humidity: reading.humidity,
+    windSpeed: reading.windspeedmph,
+    uv: reading.uv,
+    rainToday: reading.dailyrainin,
+    tempIn: reading.tempinf,
+    humidityIn: reading.humidityin,
+    pressure: reading.baromrelin,
+    stationName: CONFIG.STATION_LABEL,
+  };
+}
+
+// ── MAIN LOOP ───────────────────────────────────────────────
+async function refresh() {
+  const isConfigured = CONFIG.MAC_ADDRESS && CONFIG.API_KEY && CONFIG.APP_KEY;
+
+  if (!isConfigured) {
+    bannerEl.style.display = 'block';
+    render(DEMO);
+    return;
+  }
+
+  bannerEl.style.display = 'none';
+
+  try {
+    const data = await fetchLive();
+    render(data);
+  } catch (e) {
+    console.error('Ambient Weather fetch error:', e);
+    showError('Could not reach station — check connection.');
+  }
+}
+
+refresh();
+setInterval(refresh, CONFIG.REFRESH_MS);
+</script>
+</body>
+</html>
