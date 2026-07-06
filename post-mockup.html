@@ -1,1 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>You Need Gloves · Placemaking Report — Spec C Mockup</title>
+<style>
+  /* ── PLACEMAKING REPORT · SPEC C · POST TEMPLATE MOCKUP ──
+     Toggles top-right test: dark vs light, Courier vs sans body.
+     bg/text invert per mode · accent #f2ff00 · 2px borders
+     no border-radius, no shadows, no gradients
+  ───────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #f2ff00;
+  }
+
+  body {
+    background: #000000;
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    line-height: 1.6;
+  }
+
+  /* ── TEST TOGGLES (not part of the design — mockup only) ── */
+  #toggles {
+    position: fixed;
+    top: 10px; right: 10px;
+    z-index: 100;
+    display: flex;
+    gap: 6px;
+  }
+  .toggle-chip {
+    font: 700 11px 'Courier New', Courier, monospace;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    background: var(--accent);
+    color: #000000;
+    border: 2px solid #000000;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* ── PAGE FRAME ─────────────────────────────────────────── */
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  /* ── MASTHEAD ───────────────────────────────────────────── */
+  header.site {
+    border-bottom: 2px solid var(--accent);
+    padding: 26px 0 14px;
+    margin-bottom: 8px;
+  }
+  .masthead {
+    color: var(--accent);
+    font-size: clamp(20px, 5vw, 30px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  nav.site {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+  }
+  nav.site a {
+    color: #ffffff;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+  }
+  nav.site a:hover { border-bottom: 2px solid var(--accent); }
+
+  /* ── POST ───────────────────────────────────────────────── */
+  article { padding-top: 28px; }
+
+  .eyebrow {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  h1.post-title {
+    font-size: clamp(30px, 8vw, 52px);
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1.05;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .byline {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 26px;
+  }
+
+  /* ── VERTICAL VIDEO (the future) ────────────────────────── */
+  .video-block {
+    margin: 0 auto 10px;
+    width: min(400px, 88vw);
+  }
+  .video-frame {
+    aspect-ratio: 9 / 16;
+    border: 2px solid var(--accent);
+    background: #000000;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .video-frame iframe {
+    width: 100%; height: 100%;
+    border: none;
+    display: block;
+  }
+  .video-placeholder {
+    text-align: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 2;
+  }
+  .video-placeholder .play {
+    font-size: 54px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .video-caption {
+    margin: 8px 0 34px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  /* ── BODY TEXT ──────────────────────────────────────────── */
+  .post-body p {
+    font-size: 17px;
+    margin-bottom: 1.15em;
+  }
+  body.sans .post-body p,
+  body.sans .post-body figcaption {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  }
+  .post-body a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 2px solid var(--accent);
+  }
+  .hl {
+    background: var(--accent);
+    color: #000000;
+    font-weight: 700;
+    padding: 0 4px;
+  }
+
+  figure { margin: 30px 0; }
+  figure img {
+    width: 100%;
+    display: block;
+    border: 2px solid var(--accent);
+  }
+  figcaption {
+    margin-top: 8px;
+    font-size: 12px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+  }
+
+  /* ── PAGER (next / previous) ────────────────────────────── */
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 44px 0 0;
+  }
+  .pager a {
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    padding: 14px;
+    line-height: 1.5;
+  }
+  @media (max-width: 540px) {
+    .pager { grid-template-columns: 1fr; }
+  }
+
+  /* ── SEASONS ────────────────────────────────────────────── */
+  .seasons {
+    margin-top: 48px;
+    border-top: 2px solid var(--accent);
+    padding-top: 18px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 12px;
+  }
+  .seasons a {
+    display: block;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 15px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.35);
+  }
+  .seasons a b { color: var(--accent); text-transform: uppercase; }
+  .seasons .snum { color: var(--accent); font-weight: 700; }
+
+  /* ── NEWSLETTER ─────────────────────────────────────────── */
+  .newsletter {
+    margin-top: 40px;
+    border: 2px solid var(--accent);
+    padding: 20px;
+  }
+  .newsletter p { font-size: 14px; margin: 10px 0 16px; }
+  .btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #000000;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 12px 22px;
+    border: 2px solid var(--accent);
+  }
+
+  /* ── FOOTER ─────────────────────────────────────────────── */
+  footer.site {
+    margin-top: 48px;
+    border-top: 2px solid var(--accent);
+    padding-top: 14px;
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  footer.site a {
+    color: rgba(255,255,255,0.75);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  /* ══ LIGHT MODE ══════════════════════════════════════════
+     Inverts to printed-field-report. Acid yellow survives only
+     as highlight backgrounds and borders — never as text on
+     white (illegible). Text accents become black.
+  ═══════════════════════════════════════════════════════════ */
+  body.light { background: #ffffff; color: #000000; }
+  body.light header.site { border-bottom-color: #000000; }
+  body.light .masthead { color: #000000; background: var(--accent); display: inline-block; padding: 2px 10px 2px 6px; }
+  body.light nav.site a { color: #000000; }
+  body.light nav.site a:hover { border-bottom-color: #000000; }
+  body.light .eyebrow { color: #000000; background: var(--accent); padding: 3px 8px; }
+  body.light h1.post-title { color: #000000; }
+  body.light .byline { color: rgba(0,0,0,0.65); }
+  body.light .video-frame { border-color: #000000; background: #ffffff; }
+  body.light .video-placeholder { color: rgba(0,0,0,0.6); }
+  body.light .video-placeholder .play { color: #000000; }
+  body.light .video-caption { color: #000000; }
+  body.light .post-body a { color: #000000; border-bottom: 3px solid var(--accent); }
+  body.light figure img { border-color: #000000; }
+  body.light figcaption { color: rgba(0,0,0,0.65); }
+  body.light .pager a { border-color: #000000; color: #000000; }
+  body.light .seasons { border-top-color: #000000; }
+  body.light .section-label { color: rgba(0,0,0,0.65); }
+  body.light .seasons a { color: #000000; border-bottom-color: rgba(0,0,0,0.3); }
+  body.light .seasons a b { color: #000000; background: var(--accent); padding: 0 4px; }
+  body.light .seasons .snum { color: #000000; }
+  body.light .newsletter { border-color: #000000; }
+  body.light .btn { color: #000000; border-color: #000000; }
+  body.light footer.site { border-top-color: #000000; }
+  body.light footer.site a { color: rgba(0,0,0,0.65); }
+</style>
+</head>
+<body>
+
+<!-- Mockup-only toggles: remove before handoff to Kimble -->
+<div id="toggles">
+  <div class="toggle-chip" id="modeToggle">LIGHT</div>
+  <div class="toggle-chip" id="fontToggle">SANS BODY</div>
+</div>
+
+<div class="wrap">
+
+  <header class="site">
+    <div class="masthead">Placemaking Report</div>
+    <nav class="site">
+      <a href="#">About</a>
+      <a href="#">Contact</a>
+      <a href="#">Newsletter</a>
+      <a href="#">Tools You May Need</a>
+    </nav>
+  </header>
+
+  <article>
+    <div class="eyebrow">Season 4 · Dispatch · 04.04.2025</div>
+    <h1 class="post-title">You Need Gloves</h1>
+    <div class="byline">DC Denison</div>
+
+    <!-- ── VERTICAL VIDEO SLOT ─────────────────────────────
+         This post predates video; the slot shows the template.
+         To preview with a real Short: put its YouTube video ID
+         in YT_SHORT_ID at the bottom of this file.            -->
+    <div class="video-block">
+      <div class="video-frame" id="videoFrame">
+        <div class="video-placeholder">
+          <div class="play">▶</div>
+          Vertical video<br>9 : 16
+        </div>
+      </div>
+      <div class="video-caption">▶ Short · Placemaking Report</div>
+    </div>
+
+    <div class="post-body">
+      <p>We all need <span class="hl">GLOVES</span>. For protection: from chemicals; from smashed fingers; from cuts and scratches.</p>
+
+      <p>Gloves improve your grip; they keep your hands warm.</p>
+
+      <p>That's why <em>Placemaking Report's</em> commerce strategy is, "Ah hell, let's just recommend work gloves." (Tools too, but mostly gloves.)</p>
+
+      <p>Most people realize they need gloves when they are about ten percent into a project, far enough along that they don't want to stop and go looking for gloves.</p>
+
+      <figure>
+        <img src="https://placemakingreport.com/sites/default/files/styles/medium/public/node-images/YouNeedGloves-hero_0.jpeg?itok=PBLxbV4_" alt="you need gloves" />
+        <figcaption>You need gloves</figcaption>
+      </figure>
+
+      <p>Ideally, you should have a small pile of gloves, in a drawer or on a shelf, so that you can tug on an appropriate pair <em>before</em> you start a project.</p>
+
+      <p>You will notice, by the way, as you adjust these gloves, that your confidence will improve. Yes you can successfully face the physical challenge ahead.</p>
+
+      <p>Types of work gloves have multiplied since the last time you looked, it's safe to assume. Newer materials include nitrile, latex, synthetic leather, and cut-resistant micro fibers. New designs have touchscreen compatible fingertips, anti-vibration technology, padded knuckles. A lot of military technology is showing up in work gloves.</p>
+
+      <p>Work gloves are now micro tuned to jobs: gloves for cleaning, auto mechanics, demolition, high heat, gardening, emergency medical work, cold weather.</p>
+
+      <p>Many of our choices give us a small affiliate kickback, but not all. For example Harbor Freight doesn't do affiliate, as far as we know, but that hasn't stopped us from recommending, frequently, their Hardy brand gloves. They are just so damn inexpensive! Irresistable.</p>
+
+      <p>Good gloves, or a great deal on decent gloves, takes precedence over tiny $$$ affiliate arrangements.</p>
+
+      <p>So stop by <a href="#">Tools You May Need</a>, and pick out a pair.</p>
+    </div>
+
+    <div class="pager">
+      <a href="#">← Back to the front page</a>
+      <a href="#" style="text-align:right;">To Placemaking Tools →</a>
+    </div>
+  </article>
+
+  <div class="seasons">
+    <div class="section-label">Seasons</div>
+    <a href="#"><span class="snum">01</span> — Season One: <b>How this starts</b></a>
+    <a href="#"><span class="snum">02</span> — Season Two: <b>Maker-in-Residence</b></a>
+    <a href="#"><span class="snum">03</span> — Season Three: <b>Placemaking Reset, with video</b></a>
+    <a href="#"><span class="snum">04</span> — Season Four: <b>Going Viral</b></a>
+    <a href="#"><span class="snum">05</span> — Season Five: <b>The Place Probe Module</b></a>
+  </div>
+
+  <div class="newsletter">
+    <div class="section-label">Get Updated</div>
+    <p>Get updates on placemaking, tools, and the placemakers that are leaving their mark.</p>
+    <a class="btn" href="#">Let's Go!</a>
+  </div>
+
+  <footer class="site">
+    <a href="#">Home</a>
+    <a href="#">About</a>
+    <a href="#">Contact</a>
+    <a href="#">YouTube ↗</a>
+  </footer>
+
+</div>
+
+<script>
+// ── Put a YouTube Short's video ID here to preview real video ──
+// Example: const YT_SHORT_ID = "dQw4w9WgXcQ";
+const YT_SHORT_ID = "";
+
+if (YT_SHORT_ID) {
+  document.getElementById('videoFrame').innerHTML =
+    '<iframe src="https://www.youtube.com/embed/' + YT_SHORT_ID +
+    '" title="Placemaking Report Short" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+}
+
+// ── Mockup toggles ──────────────────────────────────────────
+const modeToggle = document.getElementById('modeToggle');
+const fontToggle = document.getElementById('fontToggle');
+
+modeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  modeToggle.textContent = document.body.classList.contains('light') ? 'DARK' : 'LIGHT';
+});
+
+fontToggle.addEventListener('click', () => {
+  document.body.classList.toggle('sans');
+  fontToggle.textContent = document.body.classList.contains('sans') ? 'COURIER BODY' : 'SANS BODY';
+});
+</script>
+</body>
+</html>
 
