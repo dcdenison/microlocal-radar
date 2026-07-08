@@ -1,1 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>News · Placemaking Report</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* ── PPM DESIGN SPEC v1 ─────────────────────────────
+     bg #000000 · text #ffffff · accent #f2ff00
+     Courier New only · 2px borders · no radius/shadow/glow
+  ──────────────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #000000;
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── BACKGROUND RADAR (map + rings + sweep) ────────── */
+  /* The map sits at the very back, heavily dimmed.
+     To make street outlines bigger, raise MAP_ZOOM in the
+     CONFIG section of the script below. */
+  #map {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer {
+    filter: grayscale(1) contrast(1.15) brightness(0.9);
+    opacity: 0.40;
+  }
+  .leaflet-control-attribution {
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 8px !important;
+    background: transparent !important;
+    color: rgba(255,255,255,0.4) !important;
+  }
+  .leaflet-control-attribution a { color: rgba(255,255,255,0.4) !important; }
+
+  #radar {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* ── FIXED HEADER ──────────────────────────────────── */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    background: #000000;
+    border-bottom: 2px solid #f2ff00;
+    padding: 14px 18px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  #header .masthead {
+    color: #f2ff00;
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #header .counter {
+    color: rgba(255,255,255,0.75);
+    font-size: clamp(10px, 2vw, 12px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── SLIDE AREA ────────────────────────────────────── */
+  #slide {
+    position: fixed;
+    top: 52px; bottom: 0; left: 0; right: 0;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 4vw;
+    padding: 3vh 3vw;
+    overflow: hidden;
+  }
+
+  /* ── LEFT: HEADLINE + SOURCE ───────────────────────── */
+  .story-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  /* Black backing strips keep type readable over the radar */
+  .headline {
+    color: #ffffff;
+    font-weight: 700;
+    line-height: 1.22;
+    background: #000000;
+    padding: 8px 10px 8px 0;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    overflow-wrap: break-word;
+  }
+  /* Autoshrink tiers — headlines of 66 characters or fewer
+     display at maximum size */
+  .headline.h-big   { font-size: clamp(26px, 4.4vw, 54px); }
+  .headline.h-mid   { font-size: clamp(20px, 3.4vw, 40px); }
+  .headline.h-small { font-size: clamp(16px, 2.6vw, 30px); }
+
+  .source {
+    align-self: flex-start;
+    color: #f2ff00;
+    background: #000000;
+    border: 2px solid #f2ff00;
+    padding: 8px 12px;
+    font-size: clamp(11px, 2vw, 14px);
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+  }
+
+  /* ── RIGHT: IMAGE + QR ─────────────────────────────── */
+  .story-media {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  /* Kept deliberately small — web-grabbed images hold up
+     better at modest size. Crops to fit, never stretches. */
+  .story-photo {
+    height: 34vh;
+    border: 2px solid #ffffff;
+    background-color: #000000;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .story-photo.empty {
+    border: 1px solid rgba(255,255,255,0.35);
+    display: grid;
+    place-items: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .qr-tile {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    border: 2px solid #f2ff00;
+    background: #000000;
+    padding: 10px;
+  }
+
+  /* QR stays black-on-white for scannability — Spec C
+     framing goes around the tile, never over it */
+  .qr-white {
+    background: #ffffff;
+    padding: 8px;
+    line-height: 0;
+  }
+
+  .qr-label {
+    color: #f2ff00;
+    font-size: clamp(9px, 1.8vw, 12px);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  /* ── STATUS (loading / error / demo notice) ────────── */
+  #status {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    z-index: 20;
+    background: #000000;
+    padding: 8px 12px;
+  }
+
+  #demo-notice {
+    position: fixed;
+    bottom: 10px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    color: rgba(255,255,255,0.6);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    background: #000000;
+    padding: 4px 10px;
+    display: none;
+  }
+
+  /* ── PORTRAIT FALLBACK (stack columns) ─────────────── */
+  @media (orientation: portrait) {
+    #slide {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto;
+      align-content: center;
+      gap: 3vh;
+    }
+    .story-photo { height: 26vh; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="map" aria-hidden="true"></div>
+<canvas id="radar" aria-hidden="true"></canvas>
+
+<div id="header">
+  <div class="masthead">Placemaking Report · News</div>
+  <div class="counter" id="counter">—</div>
+</div>
+
+<div id="status">Loading news…</div>
+<div id="demo-notice">Demo stories — add your published sheet CSV URL in the config</div>
+
+<div id="slide"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIGURATION
+//
+//  1. CSV_URL — publish your news Google Sheet as CSV
+//     (File → Share → Publish to web → CSV) and paste the
+//     address between the quotes. Until then, the page runs
+//     on built-in demo stories so you can see the design.
+//
+//     Sheet columns: Headline, Source, Story Image URL, Story URL
+//
+//  2. MAP_LAT / MAP_LNG — center of the background radar map.
+//     Currently set to the PPM's BASE location.
+//
+//  3. MAP_ZOOM — bigger number = bigger street outlines.
+//     16 is a good start; try 17 if you want them larger.
+//
+//  URL overrides for testing:
+//    news.html?hold=6          (seconds per story)
+//    news.html?csv=PASTED-URL  (temporary CSV without editing file)
+//    news.html?demo=1          (force demo stories)
+// ══════════════════════════════════════════════════════
+const CONFIG = {
+  CSV_URL:  "",
+  MAP_LAT:  42.36077,
+  MAP_LNG:  -71.13457,
+  MAP_ZOOM: 16,
+  HOLD_SECONDS: 8,
+};
+
+const params  = new URLSearchParams(location.search);
+const HOLD_MS = (parseFloat(params.get('hold')) || CONFIG.HOLD_SECONDS) * 1000;
+const CSV_URL = params.get('csv') || CONFIG.CSV_URL;
+const FORCE_DEMO = params.get('demo') === '1';
+
+// ── DEMO STORIES (used when no CSV configured) ─────────
+const DEMO_STORIES = [
+  {
+    headline: "Eight-story building proposed for Brighton Ave. dry cleaner site",
+    source: "Universal Hub",
+    image: "",
+    url: "https://www.universalhub.com/"
+  },
+  {
+    headline: "Cooling center hours extended as heat advisory continues",
+    source: "Allstonia",
+    image: "",
+    url: "https://allstonia.com/"
+  },
+  {
+    headline: "Task force reviews Harvard expansion traffic plan",
+    source: "The Harvard Crimson",
+    image: "",
+    url: "https://www.thecrimson.com/"
+  }
+];
+
+// ── BACKGROUND MAP ─────────────────────────────────────
+const map = L.map('map', {
+  zoomControl: false, dragging: false, touchZoom: false,
+  scrollWheelZoom: false, doubleClickZoom: false,
+  boxZoom: false, keyboard: false
+});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+}).addTo(map);
+map.setView([CONFIG.MAP_LAT, CONFIG.MAP_LNG], CONFIG.MAP_ZOOM);
+setTimeout(() => map.invalidateSize(), 100);
+
+// ── RADAR RINGS + THIN SWEEP ───────────────────────────
+const canvas = document.getElementById('radar');
+const ctx = canvas.getContext('2d');
+let sweep = 0;
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function fitCanvas() {
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width  = Math.round(window.innerWidth  * dpr);
+  canvas.height = Math.round(window.innerHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => {
+  fitCanvas();
+  setTimeout(() => map.invalidateSize(), 100);
+}, { passive: true });
+fitCanvas();
+
+function drawRadar() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const cx = w / 2, cy = h / 2;
+  // Oversized: outer ring bleeds past the screen edges
+  const R = Math.max(w, h) * 0.72;
+  ctx.clearRect(0, 0, w, h);
+
+  // Range rings
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 1.5;
+  for (let i = 1; i <= 4; i++) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * (i / 4), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Crosshairs
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+  ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+  ctx.stroke();
+
+  // Thin sweep line
+  const a = sweep * Math.PI / 180;
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(242,255,0,0.45)';
+  ctx.lineWidth = 2;
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+  ctx.stroke();
+
+  // Center point
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(242,255,0,0.6)';
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+(function loop() {
+  if (!REDUCED_MOTION) sweep = (sweep + 0.5) % 360;
+  drawRadar();
+  requestAnimationFrame(loop);
+})();
+
+// ── FIELD HELPERS (same logic as samples.html) ─────────
+function pickField(obj, names, regexes = []) {
+  for (const key of Object.keys(obj)) {
+    if (names.some(n => n.toLowerCase() === String(key).trim().toLowerCase())) return obj[key];
+  }
+  for (const key of Object.keys(obj)) {
+    if (regexes.some(rx => rx.test(String(key)))) return obj[key];
+  }
+  return undefined;
+}
+
+function normalizeRow(row) {
+  return {
+    headline: pickField(row, ["headline","title"], [/(headline|title)/i]),
+    source:   pickField(row, ["source","outlet"], [/(source|outlet)/i]),
+    image:    pickField(row, ["story image url","image","photo","img"], [/(image|photo|img)/i]),
+    url:      pickField(row, ["story url","url","link"], [/(url|link)/i]),
+  };
+}
+
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// ── HEADLINE AUTOSHRINK ────────────────────────────────
+// 66 characters or fewer → maximum size
+function headlineClass(text) {
+  const len = String(text || "").length;
+  if (len <= 66) return "h-big";
+  if (len <= 90) return "h-mid";
+  return "h-small";
+}
+
+// ── BUILD ONE FULL-SCREEN STORY ────────────────────────
+function slideHTML(story) {
+  const photoHTML = story.image
+    ? `<div class="story-photo" style="background-image:url('${String(story.image).replace(/'/g, "%27")}')"></div>`
+    : `<div class="story-photo empty">No image on file</div>`;
+
+  const qrHTML = story.url
+    ? `<div class="qr-tile">
+         <div class="qr-white"><div id="qr"></div></div>
+         <div class="qr-label">Scan for story</div>
+       </div>`
+    : "";
+
+  return `
+    <div class="story-text">
+      <div class="headline ${headlineClass(story.headline)}">${esc(story.headline) || "Untitled"}</div>
+      <div class="source">Source: ${esc(story.source) || "—"}</div>
+    </div>
+    <div class="story-media">
+      ${photoHTML}
+      ${qrHTML}
+    </div>`;
+}
+
+// ── LOAD + RUN SEQUENCE ────────────────────────────────
+const slideEl   = document.getElementById("slide");
+const statusEl  = document.getElementById("status");
+const counterEl = document.getElementById("counter");
+const demoEl    = document.getElementById("demo-notice");
+
+let stories = [];
+let current = 0;
+
+function showSlide(i) {
+  const s = stories[i];
+  slideEl.innerHTML = slideHTML(s);
+  counterEl.textContent =
+    String(i + 1).padStart(3, "0") + " / " + String(stories.length).padStart(3, "0");
+
+  // Generate the QR code (black on white for scannability)
+  if (s.url && window.QRCode) {
+    const qrDiv = document.getElementById("qr");
+    if (qrDiv) {
+      new QRCode(qrDiv, {
+        text: String(s.url).trim(),
+        width: 116,
+        height: 116,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }
+
+  // Pre-load the next story's image so the cut is instant
+  const next = stories[(i + 1) % stories.length];
+  if (next && next.image) {
+    const pre = new Image();
+    pre.src = next.image;
+  }
+}
+
+function startSequence(list) {
+  stories = list.filter(s => s.headline && String(s.headline).trim());
+  if (!stories.length) {
+    statusEl.textContent = "No stories found — check sheet.";
+    return;
+  }
+  statusEl.style.display = "none";
+  showSlide(0);
+  if (stories.length > 1) {
+    setInterval(() => {
+      current = (current + 1) % stories.length;
+      showSlide(current);
+    }, HOLD_MS);
+  }
+}
+
+if (!CSV_URL || FORCE_DEMO) {
+  demoEl.style.display = "block";
+  startSequence(DEMO_STORIES);
+} else {
+  Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: (res) => {
+      startSequence(res.data.map(normalizeRow));
+    },
+    error: () => {
+      statusEl.textContent = "Load error — running demo stories.";
+      demoEl.style.display = "block";
+      startSequence(DEMO_STORIES);
+    }
+  });
+}
+</script>
+</body>
+</html>
 
