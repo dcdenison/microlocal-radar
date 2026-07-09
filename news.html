@@ -273,7 +273,7 @@
 //    news.html?demo=1          (force demo stories)
 // ══════════════════════════════════════════════════════
 const CONFIG = {
-  CSV_URL:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOyyHdWF36216-V-JDLM4jrdR1aYwsAr1AVGx3H706ERA_g2b7GmzScPnJY0zI2dad5wF03kMpCSRq/pub?gid=0&single=true&output=csv",
+  CSV_URL:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOyyHdWF36216-V-JDLM4jrdR1aYwsAr1AVGx3H706ERA_g2b7GmzScPnJY0zI2dad5wF03kMpCSRq/pub?output=csv",
   MAP_LAT:  42.36077,
   MAP_LNG:  -71.13457,
   MAP_ZOOM: 16,
@@ -341,12 +341,13 @@ fitCanvas();
 function drawRadar() {
   const w = window.innerWidth, h = window.innerHeight;
   const cx = w / 2, cy = h / 2;
-  // Oversized: outer ring bleeds past the screen edges
-  const R = Math.max(w, h) * 0.72;
+  // Version B: full radar circle sized to ~108% of screen
+  // height — whole instrument visible with a slight edge bleed.
+  const R = h * 0.54;
   ctx.clearRect(0, 0, w, h);
 
-  // Range rings
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  // Range rings — Version B brightness
+  ctx.strokeStyle = 'rgba(255,255,255,0.26)';
   ctx.lineWidth = 1.5;
   for (let i = 1; i <= 4; i++) {
     ctx.beginPath();
@@ -360,19 +361,19 @@ function drawRadar() {
   ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
   ctx.stroke();
 
-  // Thin sweep line
+  // Sweep line — Version B: thicker (5px) and brighter
   const a = sweep * Math.PI / 180;
   ctx.beginPath();
-  ctx.strokeStyle = 'rgba(242,255,0,0.45)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(242,255,0,0.6)';
+  ctx.lineWidth = 5;
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
   ctx.stroke();
 
   // Center point
   ctx.beginPath();
-  ctx.fillStyle = 'rgba(242,255,0,0.6)';
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(242,255,0,0.7)';
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -517,4 +518,3 @@ if (!CSV_URL || FORCE_DEMO) {
 </script>
 </body>
 </html>
-
