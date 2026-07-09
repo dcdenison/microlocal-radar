@@ -30,12 +30,18 @@
   #map {
     position: fixed;
     inset: 0;
-    z-index: 0;
+    z-index: 2;
     pointer-events: none;
+    mix-blend-mode: screen;
   }
+  .leaflet-container { background: transparent !important; }
+  /* The map rides ABOVE the radar as a skeletal white street layer.
+     'screen' blend drops the dark tile background to nothing and lets
+     only the bright streets show; the filter pushes those streets to
+     near-white so they read as a clean outline of THIS spot on earth. */
   #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer {
-    filter: grayscale(1) contrast(1.2) brightness(0.55);
-    opacity: 0.32;
+    filter: grayscale(1) brightness(1.7) contrast(1.9);
+    opacity: 0.55;
   }
   .leaflet-control-attribution {
     font-family: 'Courier New', Courier, monospace !important;
@@ -111,7 +117,7 @@
     font-weight: 700;
     line-height: 1.22;
     background: #000000;
-    padding: 8px 10px 8px 0;
+    padding: 10px 18px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     overflow-wrap: break-word;
@@ -341,26 +347,26 @@ fitCanvas();
 function drawRadar() {
   const w = window.innerWidth, h = window.innerHeight;
   const cx = w / 2, cy = h / 2;
-  // Turned up to 11: a big, bright instrument that fills the frame.
-  // Outer rings bleed past the top/bottom edges — mysterious, like
-  // the sweep continues beyond the screen. 5 range rings.
-  const R = h * 0.62;
+  // Radically graphic: a big, bold instrument that fills the frame.
+  // Outer rings bleed past the top/bottom edges. 5 range rings.
+  const R = h * 0.66;
   ctx.clearRect(0, 0, w, h);
 
-  // Dark radial vignette — deepens the center and pushes the map
-  // back into the shadows for a more mysterious field.
-  const vg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-  vg.addColorStop(0,   'rgba(0,0,0,0.55)');
-  vg.addColorStop(0.6, 'rgba(0,0,0,0.32)');
-  vg.addColorStop(1,   'rgba(0,0,0,0.0)');
+  // Self-painted dark field — the radar no longer depends on the
+  // map tiles for its darkness. The map (if it loads) ghosts through.
+  ctx.fillStyle = 'rgba(0,0,0,0.80)';
+  ctx.fillRect(0, 0, w, h);
+  const vg = ctx.createRadialGradient(cx, cy, R * 0.08, cx, cy, R);
+  vg.addColorStop(0, 'rgba(0,0,0,0.40)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.0)');
   ctx.fillStyle = vg;
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.fill();
 
-  // Radial spokes every 30° — faint instrument grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
+  // Radial spokes every 30°
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 1.5;
   for (let deg = 0; deg < 360; deg += 30) {
     const a = deg * Math.PI / 180;
     ctx.beginPath();
@@ -369,33 +375,45 @@ function drawRadar() {
     ctx.stroke();
   }
 
-  // 5 range rings — bright white on the dark field
-  ctx.strokeStyle = 'rgba(255,255,255,0.32)';
-  ctx.lineWidth = 1.5;
+  // 5 range rings — bright and thick
+  ctx.strokeStyle = 'rgba(255,255,255,0.50)';
+  ctx.lineWidth = 2;
   for (let i = 1; i <= 5; i++) {
     ctx.beginPath();
     ctx.arc(cx, cy, R * (i / 5), 0, Math.PI * 2);
     ctx.stroke();
   }
 
+  // Bearing ticks around the outer ring (long tick every 90°)
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 2;
+  for (let deg = 0; deg < 360; deg += 15) {
+    const a = deg * Math.PI / 180;
+    const inset = (deg % 90 === 0) ? 28 : 14;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+    ctx.lineTo(cx + Math.cos(a) * (R - inset), cy + Math.sin(a) * (R - inset));
+    ctx.stroke();
+  }
+
   // Bold crosshairs
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
   ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
   ctx.stroke();
 
-  // ── SWEEP: wide glowing wedge with a comet-tail trail ──
+  // ── SWEEP: fat glowing wedge with a long comet-tail trail ──
   const lead = sweep * Math.PI / 180;   // leading edge angle
-  const TAIL_DEG = 80;                  // how far the glow trails behind
-  const SEG = 40;                       // fade resolution
+  const TAIL_DEG = 110;                 // how far the glow trails behind
+  const SEG = 55;                       // fade resolution
   for (let s = 0; s < SEG; s++) {
     const t0 = s / SEG;
     const t1 = (s + 1) / SEG;
     const a0 = lead - (t0 * TAIL_DEG) * Math.PI / 180;
     const a1 = lead - (t1 * TAIL_DEG) * Math.PI / 180;
-    const alpha = 0.34 * (1 - t0);      // brightest at the leading edge
+    const alpha = 0.50 * (1 - t0);      // brightest at the leading edge
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, R, a1, a0);
@@ -406,17 +424,22 @@ function drawRadar() {
 
   // Bright leading-edge line
   ctx.beginPath();
-  ctx.strokeStyle = 'rgba(242,255,0,0.85)';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(242,255,0,0.95)';
+  ctx.lineWidth = 4;
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + Math.cos(lead) * R, cy + Math.sin(lead) * R);
   ctx.stroke();
 
   // Center hub
   ctx.beginPath();
-  ctx.fillStyle = 'rgba(242,255,0,0.9)';
-  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(242,255,0,1)';
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
   ctx.fill();
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(242,255,0,0.55)';
+  ctx.lineWidth = 2;
+  ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 (function loop() {
