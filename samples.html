@@ -208,6 +208,11 @@ function truthy(v) {
   const s = String(v ?? "").trim().toLowerCase();
   return ['1','true','yes','y','t'].includes(s);
 }
+function isRowActive(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "") return true;
+  return !["0","false","no","n","f","off","inactive","hide","hidden"].includes(s);
+}
 
 function normalizeRow(row) {
   return {
@@ -218,6 +223,7 @@ function normalizeRow(row) {
     image:     pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
     features:  pickField(row, ["features","significance","highlights"], [/(features?|significance|highlights?)/i]),
     is_center: truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i])),
+    active:    isRowActive(pickField(row, ["active","enabled"], [/^\s*(active|enabled)\s*$/i])),
   };
 }
 
@@ -296,7 +302,7 @@ Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
   complete: (res) => {
     samples = res.data
       .map(normalizeRow)
-      .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+      .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.active);
 
     if (!samples.length) {
       statusEl.textContent = "No samples found — check sheet.";
