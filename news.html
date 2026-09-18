@@ -24,24 +24,25 @@
   }
 
   /* ── BACKGROUND RADAR (map + rings + sweep) ────────── */
-  /* The map sits at the very back, heavily dimmed.
-     To make street outlines bigger, raise MAP_ZOOM in the
-     CONFIG section of the script below. */
+  /* The map sits at the very back, dimmed, with the radar canvas
+     drawn directly on top of it — same stacking as index.html. */
   #map {
     position: fixed;
     inset: 0;
-    z-index: 2;
+    z-index: 0;
     pointer-events: none;
-    mix-blend-mode: screen;
   }
   .leaflet-container { background: transparent !important; }
-  /* The map rides ABOVE the radar as a skeletal white street layer.
-     'screen' blend drops the dark tile background to nothing and lets
-     only the bright streets show; the filter pushes those streets to
-     near-white so they read as a clean outline of THIS spot on earth. */
+  /* The Survey backdrop is already a clean brutalist black/white/acid-yellow
+     image — no color-stripping filter needed. Just dim it slightly so the
+     radar rings and sweep read clearly on top. (Older versions of this page
+     used a 'screen' blend + grayscale filter built for the old busy CARTO
+     tiles; with the map now BELOW the radar canvas instead of above it,
+     that trick is unnecessary and was letting the sweep's color bleed
+     through the map's black areas as an olive wash — removed.) */
   #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer, #map .leaflet-image-layer {
-    filter: grayscale(1) brightness(1.7) contrast(1.9);
-    opacity: 0.55;
+    filter: contrast(1.05) brightness(1.0);
+    opacity: 0.85;
   }
   .leaflet-control-attribution {
     font-family: 'Courier New', Courier, monospace !important;
@@ -57,6 +58,9 @@
     z-index: 1;
     pointer-events: none;
   }
+  /* #radar (z-index 1) draws directly on top of #map (z-index 0) — the
+     canvas's own translucent black wash and rings/sweep naturally dim
+     and overlay the map beneath, no blend-mode needed. */
 
   /* ── FIXED HEADER ──────────────────────────────────── */
   #header {
@@ -316,9 +320,10 @@ const DEMO_STORIES = [
 // ── BACKGROUND MAP ─────────────────────────────────────
 // Static "Survey" backdrop — a recolored USGS topo quad (Newton + Boston South,
 // stitched, orthoimagery stripped), replacing the live CARTO dark tiles. Same
-// image/bounds as index.html so both pages show the same map. The existing
-// 'screen' blend + filter above (unchanged) still does the work of turning it
-// into bright skeletal streets on black.
+// image/bounds as index.html so both pages show the same map. It sits BELOW
+// the radar canvas (see #map / #radar CSS above) and is just dimmed with a
+// plain opacity/contrast filter — no color-stripping or blend-mode needed,
+// since the backdrop is already clean brutalist black/white/acid-yellow.
 const map = L.map('map', {
   zoomControl: false, dragging: false, touchZoom: false,
   scrollWheelZoom: false, doubleClickZoom: false,
