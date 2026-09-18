@@ -332,12 +332,52 @@ const map = L.map('map', {
 const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
 const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
 L.imageOverlay(SURVEY_IMAGE_URL, SURVEY_BOUNDS, { attribution: 'USGS' }).addTo(map);
-// Fit the view to the backdrop image's own real-world extent (not a fixed
-// zoom level) so it reliably fills the frame on any screen size — same fix
-// applied on index.html, where a mismatched zoom left the image looking
-// like a tiny patch surrounded by empty space.
-map.fitBounds(SURVEY_BOUNDS, { animate: false });
-setTimeout(() => map.invalidateSize(), 100);
+
+// fitBounds() alone only ever "contains" the image — it fits the whole thing
+// inside the view, leaving empty margins (pillarboxing) whenever the screen's
+// shape doesn't exactly match the image's shape. This instead crops to a
+// sub-window of the Survey bounds sized to match the container's own aspect
+// ratio, then fits THAT — same idea as CSS background-size:cover. Result:
+// the image always fills the frame completely, edge to edge, cropping
+// whichever side has extra instead of leaving gray/black margins. Same
+// helper as index.html.
+function fitMapCover(mapInst, geoBounds){
+  const size = mapInst.getSize();
+  if (!size.x || !size.y) return;
+  const containerAspect = size.x / size.y;
+  const sw = geoBounds.getSouthWest(), ne = geoBounds.getNorthEast();
+  const centerLat = (sw.lat + ne.lat) / 2, centerLng = (sw.lng + ne.lng) / 2;
+  const KM_PER_DEG_LAT = 111.32;
+  const kmPerDegLng = 111.32 * Math.cos(centerLat * Math.PI / 180);
+  const heightKm = (ne.lat - sw.lat) * KM_PER_DEG_LAT;
+  const widthKm  = (ne.lng - sw.lng) * kmPerDegLng;
+  const imgAspect = widthKm / heightKm;
+
+  let coverBounds;
+  if (containerAspect > imgAspect){
+    // Screen is relatively wider than the image — use its full width, crop top/bottom.
+    const neededHeightKm = widthKm / containerAspect;
+    const halfHeightDeg = (neededHeightKm / KM_PER_DEG_LAT) / 2;
+    coverBounds = L.latLngBounds(
+      [centerLat - halfHeightDeg, sw.lng],
+      [centerLat + halfHeightDeg, ne.lng]
+    );
+  } else {
+    // Screen is relatively taller than the image — use its full height, crop left/right.
+    const neededWidthKm = heightKm * containerAspect;
+    const halfWidthDeg = (neededWidthKm / kmPerDegLng) / 2;
+    coverBounds = L.latLngBounds(
+      [sw.lat, centerLng - halfWidthDeg],
+      [ne.lat, centerLng + halfWidthDeg]
+    );
+  }
+  mapInst.fitBounds(coverBounds, { animate: false });
+}
+
+// Fit the view to the backdrop image's own real-world extent, cropped to
+// cover the screen completely (not a fixed zoom level) so it reliably fills
+// the frame edge to edge on any screen size — same fix applied on index.html.
+setTimeout(() => { map.invalidateSize(); fitMapCover(map, L.latLngBounds(SURVEY_BOUNDS)); }, 100);
 
 // ── RADAR RINGS + THIN SWEEP ───────────────────────────
 const canvas = document.getElementById('radar');
@@ -353,7 +393,7 @@ function fitCanvas() {
 }
 window.addEventListener('resize', () => {
   fitCanvas();
-  setTimeout(() => map.invalidateSize(), 100);
+  setTimeout(() => { map.invalidateSize(); fitMapCover(map, L.latLngBounds(SURVEY_BOUNDS)); }, 100);
 }, { passive: true });
 fitCanvas();
 
