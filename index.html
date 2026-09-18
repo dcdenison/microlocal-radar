@@ -25,6 +25,13 @@
     }
     html, body { margin:0; height:100%; background:#000000; overflow:hidden; user-select:none; touch-action:none; }
     #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    /* Leaflet's own default CSS paints its container a light gray (#ddd).
+       The Survey image is roughly square but this container isn't always
+       (e.g. the wide top strip in portrait mode below), so the image gets
+       letterboxed — and without this override, that empty margin showed
+       Leaflet's gray instead of black, which the radar's dark overlay then
+       dimmed into a flat gray wash across part of the frame. */
+    .leaflet-container { background: #000000 !important; }
     #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer, #map .leaflet-image-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
     #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
     canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; border: 2px solid var(--accent); box-shadow:none; display:block; }
