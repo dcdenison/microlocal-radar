@@ -221,6 +221,10 @@ function normalizeRow(row) {
     lng:       toNum(pickField(row, ["lng","lon","longitude"], [/(lng|lon(gitude)?)/i])),
     notes:     pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]),
     image:     pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]),
+    // Sample_Image is the vertical/portrait photo for this full-screen page.
+    // Falls back to the horizontal "image" column so older rows that only
+    // ever had one photo keep working without any sheet edits.
+    sampleImage: pickField(row, ["sample_image","sampleimage","vertical_image","portrait_image"], [/sample.?image/i, /(vertical|portrait).?image/i]),
     features:  pickField(row, ["features","significance","highlights"], [/(features?|significance|highlights?)/i]),
     is_center: truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i])),
     active:    isRowActive(pickField(row, ["active","enabled"], [/^\s*(active|enabled)\s*$/i])),
@@ -260,8 +264,11 @@ function slideHTML(sample, index) {
        <ul class="sig-list">${feats.map(f => `<li>${esc(f)}</li>`).join("")}</ul>`
     : "";
 
-  const photoHTML = sample.image
-    ? `<div class="photo" style="background-image:url('${String(sample.image).replace(/'/g, "%27")}')"></div>`
+  // Prefer the vertical Sample_Image photo for this full-screen layout;
+  // fall back to the horizontal radar image if no vertical photo exists yet.
+  const samplePhoto = sample.sampleImage || sample.image;
+  const photoHTML = samplePhoto
+    ? `<div class="photo" style="background-image:url('${String(samplePhoto).replace(/'/g, "%27")}')"></div>`
     : `<div class="photo empty">No image on file</div>`;
 
   return `
@@ -289,9 +296,10 @@ function showSlide(i) {
 
   // Pre-load the next sample's photo so the cut is instant
   const next = samples[(i + 1) % samples.length];
-  if (next && next.image) {
+  const nextPhoto = next && (next.sampleImage || next.image);
+  if (nextPhoto) {
     const pre = new Image();
-    pre.src = next.image;
+    pre.src = nextPhoto;
   }
 }
 
