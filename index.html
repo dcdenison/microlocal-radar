@@ -9,50 +9,51 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root{
-      --ring: rgba(30,100,220,0.75);
-      --sweepA: rgba(255,198,0,0.07);
-      --sweepB: rgba(255,198,0,0.68);
-      --text: #e8eeff;
-      --glass: rgba(0,8,40,0.80);
-      --border: rgba(30,100,220,0.45);
-      --map-filter: grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg);
-      --map-opacity: 0.72;
+      --accent: #f2ff00;
+      --ring: rgba(255,255,255,0.55);
+      --sweepA: rgba(242,255,0,0.06);
+      --sweepB: rgba(242,255,0,0.62);
+      --text: #ffffff;
+      --glass: rgba(0,0,0,0.88);
+      --border: rgba(255,255,255,0.55);
+      --map-filter: contrast(1.05) brightness(1.0);
+      --map-opacity: 0.85;
       --dot-size: 10px;
       --dot-size-active: 14px;
-      --ring-weight: 2.5;
+      --ring-weight: 2;
       --sweep-width-deg: 26;
     }
-    html, body { margin:0; height:100%; background:#000818; overflow:hidden; user-select:none; touch-action:none; }
+    html, body { margin:0; height:100%; background:#000000; overflow:hidden; user-select:none; touch-action:none; }
     #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
     #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer, #map .leaflet-image-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
     #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
-    canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 52px rgba(255,198,0,0.40), 0 0 22px rgba(0,50,180,0.50); display:block; }
+    canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; border: 2px solid var(--accent); box-shadow:none; display:block; }
 
-    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:#ffc600; background:rgba(0,8,48,0.88); border:1px solid rgba(30,100,220,0.60); border-radius:12px; padding:6px 12px; font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; z-index: 40; letter-spacing:0.04em; }
+    #titleStrip{ position:fixed; top:10px; left:50%; transform:translateX(-50%); color:var(--accent); background:#000000; border:2px solid var(--accent); border-radius:0; padding:6px 12px; font: 700 14px 'Courier New', Courier, monospace; z-index: 40; letter-spacing:0.08em; text-transform:uppercase; }
 
     #panel { position: fixed; top: 10px; left: 10px; z-index: 50; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-    .chip { padding:6px 10px; border-radius: 12px; font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; cursor:pointer; user-select:none; }
-    .chip.toggle { background:#baffbf; color:#003300; border:1px solid #77ff88; }
-    .chip.bold   { background:#ffe9bd; color:#3a2400; border:1px solid #ffd27a; }
-    .chip.input  { background:rgba(255,255,255,0.08); color:#aac4ff; border:1px solid var(--border); padding:0 0; }
-    .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#aac4ff; font: 11px 'Courier New', monospace; }
+    .chip { padding:6px 10px; border-radius: 0; font: 12px 'Courier New', Courier, monospace; text-transform:uppercase; letter-spacing:0.04em; cursor:pointer; user-select:none; background:#000000; color:#ffffff; border:2px solid #ffffff; }
+    .chip.toggle { background:#000000; color:var(--accent); border:2px solid var(--accent); }
+    .chip.bold   { background:#000000; color:#ffffff; border:2px solid #ffffff; }
+    .chip.input  { background:#000000; color:#ffffff; border:2px solid #ffffff; padding:0 0; }
+    .chip.input input { width: 600px; border: none; outline: none; padding: 6px 10px; background: transparent; color:#ffffff; font: 11px 'Courier New', monospace; }
     .chip.small  { font-size: 11px; padding: 5px 8px; }
 
-    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#aac4ff; font:12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; opacity:.9; background:rgba(0,8,48,.82); padding:6px 10px; border-radius:10px; border:1px solid rgba(30,100,220,0.45); z-index: 40; }
+    #status { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); color:#ffffff; font:12px 'Courier New', Courier, monospace; letter-spacing:0.03em; opacity:.95; background:#000000; padding:6px 10px; border-radius:0; border:2px solid #ffffff; z-index: 40; }
 
-    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: rgba(0,8,48,0.92); color: #e8eeff; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; border: 1px solid rgba(30,100,220,0.55); border-radius: 14px; overflow: hidden; box-shadow: 0 0 28px rgba(255,198,0,0.22), 0 0 12px rgba(0,50,180,0.40); pointer-events: none; z-index: 30; }
-    #card .img { width: 100%; aspect-ratio: 16/9; background: rgba(0,8,48,0.6); display:grid; place-items:center; overflow:hidden; }
+    #card { position: fixed; right: 14px; bottom: 14px; width: min(36vmin, 360px); background: #000000; color: #ffffff; font: 14px 'Courier New', Courier, monospace; border: 2px solid #ffffff; border-radius: 0; overflow: hidden; box-shadow: none; pointer-events: none; z-index: 30; }
+    #card .img { width: 100%; aspect-ratio: 16/9; background: #000000; display:grid; place-items:center; overflow:hidden; }
     #card .img img { width:100%; height:100%; object-fit: cover; display:block; }
     #card .img .placeholder { font-size: 13px; opacity: .8; padding: 12px; text-align:center; }
-    #card .body { padding: 10px 12px 12px; border-top: 1px solid rgba(30,100,220,0.30); }
-    #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: #ffc600; }
-    #card .desc { font-size: 13px; opacity: .9; color: #aac4ff; }
-    #card .meta { margin: 0 0 6px; font-size: 11px; font-family: 'Courier New', monospace; letter-spacing: 0.10em; text-transform: uppercase; color: #1e64dc; opacity: 1; min-height: 1.2em; display: block; }
+    #card .body { padding: 10px 12px 12px; border-top: 2px solid #ffffff; }
+    #card .title { font-weight: 700; font-size: 16px; line-height: 1.2; margin: 0 0 6px; color: var(--accent); }
+    #card .desc { font-size: 13px; opacity: .9; color: #ffffff; }
+    #card .meta { margin: 0 0 6px; font-size: 11px; font-family: 'Courier New', monospace; letter-spacing: 0.10em; text-transform: uppercase; color: var(--accent); opacity: 1; min-height: 1.2em; display: block; }
 
-    #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: rgba(0,0,0,0.85); border:1px solid var(--border); color:#aac4ff; font: 10px 'Courier New', monospace; border-radius: 10px; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
+    #debug { position: fixed; left: 10px; bottom: 10px; padding: 6px 8px; background: #000000; border:2px solid #ffffff; color:#ffffff; font: 10px 'Courier New', monospace; border-radius: 0; z-index: 45; max-width: 400px; max-height: 200px; overflow-y: auto; }
 
     /* ── PORTRAIT / SHORTS MODE ─────────────────────────────────────────── */
-    body.portrait { background: #000818; }
+    body.portrait { background: #000000; }
 
     body.portrait #map { bottom: 40%; }
 
@@ -63,7 +64,8 @@
 
     body.portrait canvas {
       width: 96vw; height: 96vw;
-      box-shadow: 0 0 64px rgba(255,198,0,0.48), 0 0 24px rgba(0,50,180,0.55);
+      border: 2px solid var(--accent);
+      box-shadow: none;
     }
 
     body.portrait #titleStrip {
@@ -75,10 +77,10 @@
       width: 100%; max-width: 100%;
       border-radius: 0;
       border-left: none; border-right: none; border-bottom: none;
-      border-top: 2px solid #1e64dc;
+      border-top: 2px solid #ffffff;
       display: flex; flex-direction: column;
       height: 40%;
-      box-shadow: 0 -6px 32px rgba(0,30,120,0.60);
+      box-shadow: none;
     }
 
     /* Horizontal image across full width, fixed height */
@@ -86,7 +88,7 @@
       width: 100%; flex-shrink: 0;
       height: 52%;
       aspect-ratio: unset;
-      border-bottom: 1px solid rgba(30,100,220,0.35);
+      border-bottom: 2px solid #ffffff;
     }
 
     /* Specimen label below the image */
@@ -103,7 +105,7 @@
       font-family: 'Courier New', monospace;
       letter-spacing: 0.10em;
       text-transform: uppercase;
-      color: #1e64dc;
+      color: var(--accent);
       opacity: 1;
       margin: 0;
     }
@@ -111,7 +113,7 @@
     body.portrait #card .title {
       font-size: clamp(15px, 4.2vw, 24px);
       margin: 0; line-height: 1.15;
-      color: #ffc600;
+      color: var(--accent);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -119,7 +121,7 @@
 
     body.portrait #card .desc {
       font-size: clamp(11px, 2.8vw, 15px); opacity: 0.82; line-height: 1.3;
-      color: #aac4ff;
+      color: #ffffff;
       display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; overflow: hidden;
       margin: 0;
@@ -134,10 +136,10 @@
       font-size: 8px !important;
       opacity: 0.45 !important;
       background: transparent !important;
-      color: #aac4ff !important;
+      color: #ffffff !important;
       padding: 1px 4px !important;
     }
-    body.portrait .leaflet-control-attribution a { color: #aac4ff !important; }
+    body.portrait .leaflet-control-attribution a { color: #ffffff !important; }
   </style>
 </head>
 <body>
@@ -147,10 +149,10 @@
     <div class="chip bold" title="Bold Radar look">Bold</div>
     <div class="chip input" title="CSV URL for Live mode"><input id="csvUrlInput" placeholder="CSV URL (output=csv)" /></div>
     <div id="reloadBtn" class="chip small toggle" title="Reload data">Reload</div>
-    <div class="chip small" id="showUrlBtn" title="Show full CSV URL" style="background:#e0f0ff; color:#003366; border:1px solid #88c0ff;">Show URL</div>
+    <div class="chip small" id="showUrlBtn" title="Show full CSV URL" style="background:#000000; color:#ffffff; border:2px solid #ffffff;">Show URL</div>
     <div class="chip small" id="kioskToggle" title="Toggle Kiosk Mode - Press 'K' to toggle (only way to exit kiosk mode)">Kiosk: OFF</div>
-    <div class="chip small" id="debugToggle" title="Toggle Debug Info" style="background:#ffd7a3; color:#3a2400; border:1px solid #ffb366;">Debug: ON</div>
-    <div id="zoomOut" class="chip small" style="background:#dde8ff; color:#003; border:1px solid #88aaff; font-size:16px; line-height:1; padding:2px 11px;">−</div><div id="zoomReset" class="chip small" style="background:#dde8ff; color:#003; border:1px solid #88aaff;">100%</div><div id="zoomIn" class="chip small" style="background:#dde8ff; color:#003; border:1px solid #88aaff; font-size:16px; line-height:1; padding:2px 10px;">+</div>
+    <div class="chip small" id="debugToggle" title="Toggle Debug Info" style="background:#000000; color:var(--accent); border:2px solid var(--accent);">Debug: ON</div>
+    <div id="zoomOut" class="chip small" style="background:#000000; color:#ffffff; border:2px solid #ffffff; font-size:16px; line-height:1; padding:2px 11px;">−</div><div id="zoomReset" class="chip small" style="background:#000000; color:#ffffff; border:2px solid #ffffff;">100%</div><div id="zoomIn" class="chip small" style="background:#000000; color:#ffffff; border:2px solid #ffffff; font-size:16px; line-height:1; padding:2px 10px;">+</div>
   </div>
   <div id="titleStrip">Microlocal Radar</div>
   <div id="stage"><canvas id="radar"></canvas></div>
@@ -228,9 +230,9 @@
     applyPortrait();
 
     function applyPreset(){
-      document.documentElement.style.setProperty("--map-filter", "grayscale(0.15) contrast(1.05) brightness(0.95) saturate(1.1) hue-rotate(200deg)");
-      document.documentElement.style.setProperty("--map-opacity", 0.72);
-      document.documentElement.style.setProperty("--ring-weight", 2.5);
+      document.documentElement.style.setProperty("--map-filter", "contrast(1.05) brightness(1.0)");
+      document.documentElement.style.setProperty("--map-opacity", 0.85);
+      document.documentElement.style.setProperty("--ring-weight", 2);
       document.documentElement.style.setProperty("--dot-size", "10px");
       document.documentElement.style.setProperty("--dot-size-active", "14px");
       document.documentElement.style.setProperty("--sweep-width-deg", 26);
@@ -334,8 +336,8 @@
     // unchanged. Covers roughly a 0.8mi radius around BASE (96 Holton St).
     const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
     const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
-    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffc600;border:1px solid #1e64dc;box-shadow:0 0 14px #ffc600;filter:drop-shadow(0 0 4px #1e64dc)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
-    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#1e64dc;border:1px solid #fff;box-shadow:0 0 14px #1e64dc"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
+    const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#f2ff00;border:1px solid #000000;"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
+    const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#ffffff;border:1px solid #f2ff00;"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
 
     function ensureMap(lat=42.36077, lng=-71.13457){
       if (map) return;
@@ -351,7 +353,7 @@
       if (centerMarker) centerMarker.remove();
       centerMarker = L.marker([center.lat, center.lng], { icon: new CenterIcon() }).addTo(map);
       if (mileCircle) mileCircle.remove();
-      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#1e64dc', weight: 1.5, fillColor: '#1e64dc', fillOpacity: 0.04 }).addTo(map);
+      mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#f2ff00', weight: 1.5, fillColor: '#f2ff00', fillOpacity: 0.04 }).addTo(map);
       pointsLayer.clearLayers();
       others.forEach(p => { L.marker([p.lat, p.lng], { icon: new DotIcon() }).addTo(pointsLayer); });
       const bounds = mileCircle.getBounds();
@@ -418,8 +420,8 @@
       ctx.save();
       ctx.beginPath(); ctx.arc(r, r, r-2, 0, Math.PI*2); ctx.clip();
 
-      // Deep navy background inside the circle
-      ctx.fillStyle = 'rgba(0,6,32,0.45)'; ctx.fillRect(0,0,w,h);
+      // Black background inside the circle
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0,0,w,h);
 
       // Rings in marathon blue
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ring');
@@ -449,44 +451,43 @@
         const size = (isActive ? activeSize : baseSize) * distanceScale;
         const opacity = 0.7 + (1 - distFrac) * 0.3;
         
-        // Gold dots, glow in marathon blue
+        // Acid-yellow dots, hard black outline — no glow, brutalist
         ctx.beginPath();
-        ctx.fillStyle = isActive ? '#ffc600' : `rgba(255,198,0,${opacity})`;
-        ctx.shadowColor = isActive ? '#ffc600' : 'rgba(30,100,220,0.9)';
-        ctx.shadowBlur = isActive ? 18 : 12;
-        ctx.arc(c.x, c.y, size, 0, Math.PI*2); 
+        ctx.fillStyle = isActive ? '#f2ff00' : `rgba(242,255,0,${opacity})`;
+        ctx.arc(c.x, c.y, size, 0, Math.PI*2);
         ctx.fill();
-        ctx.shadowBlur = 0;
-        
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
         if (isActive){
           const t = (Date.now()%1000)/1000; const pulse = 11 + Math.sin(t*Math.PI*2)*3.0;
-          ctx.beginPath(); ctx.strokeStyle = 'rgba(255,198,0,0.7)'; ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.strokeStyle = 'rgba(242,255,0,0.7)'; ctx.lineWidth = 2;
           ctx.arc(c.x, c.y, 13 + pulse, 0, Math.PI*2); ctx.stroke();
 
           // Sample number beside the active dot — the link to the Samples ledger
+          // Outlined text (black stroke behind acid-yellow fill) for legibility
+          // against the map without using a blur/glow.
           const activePoint = points[c.i];
           if (activePoint && activePoint.num){
             const numLabel = '№' + String(activePoint.num).padStart(3,'0');
             ctx.font = '700 13px "Courier New", monospace';
-            ctx.fillStyle = '#ffc600';
-            ctx.shadowColor = 'rgba(0,8,24,0.9)';
-            ctx.shadowBlur = 6;
-            if (c.x > r){
-              ctx.textAlign = 'right';
-              ctx.fillText(numLabel, c.x - 20, c.y - 16);
-            } else {
-              ctx.textAlign = 'left';
-              ctx.fillText(numLabel, c.x + 20, c.y - 16);
-            }
-            ctx.shadowBlur = 0;
+            ctx.lineJoin = 'round';
+            const tx = c.x > r ? c.x - 20 : c.x + 20;
+            ctx.textAlign = c.x > r ? 'right' : 'left';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#000000';
+            ctx.strokeText(numLabel, tx, c.y - 16);
+            ctx.fillStyle = '#f2ff00';
+            ctx.fillText(numLabel, tx, c.y - 16);
             ctx.textAlign = 'left';
           }
         }
       }
 
-      // Center dot in marathon blue
-      ctx.beginPath(); ctx.fillStyle = '#1e64dc'; ctx.shadowColor='#1e64dc'; ctx.shadowBlur=16; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(30,100,220,0.8)'; ctx.lineWidth = 1.7; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
+      // Center dot (BASE) — white with acid-yellow ring, no glow
+      ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(r, r, 7, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.strokeStyle = '#f2ff00'; ctx.lineWidth = 2; ctx.arc(r, r, 12, 0, Math.PI*2); ctx.stroke();
 
       ctx.restore();
     }
@@ -558,12 +559,12 @@
         const img=new Image(); img.alt=p.name||''; img.decoding='async'; img.loading='eager';
         img.onload=()=>{ imgWrap.innerHTML=''; imgWrap.appendChild(img); };
         img.onerror=()=>{
-          const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+          const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="Courier New, monospace" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
           imgWrap.innerHTML=''; imgWrap.appendChild(f);
         };
         img.src=p.image;
       } else {
-        const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
+        const f=new Image(); f.src='data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="black"/><text x="50%" y="50%" fill="white" font-family="Courier New, monospace" font-size="22" text-anchor="middle" dominant-baseline="middle">No image available</text></svg>');
         imgWrap.innerHTML=''; imgWrap.appendChild(f);
       }
     }
