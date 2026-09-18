@@ -24,7 +24,7 @@
     }
     html, body { margin:0; height:100%; background:#000818; overflow:hidden; user-select:none; touch-action:none; }
     #map { position:fixed; inset:0; z-index:0; pointer-events:none; }
-    #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
+    #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer, #map .leaflet-image-layer { filter: var(--map-filter); opacity: var(--map-opacity); }
     #stage { position:fixed; inset:0; display:grid; place-items:center; z-index: 20; pointer-events: none; }
     canvas { width:min(98vmin, 100%); height:min(98vmin, 100%); aspect-ratio:1/1; border-radius:50%; box-shadow:0 0 52px rgba(255,198,0,0.40), 0 0 22px rgba(0,50,180,0.50); display:block; }
 
@@ -327,16 +327,20 @@
     }
     window.addEventListener('resize', fitCanvas, {passive:true}); fitCanvas();
 
-    let map, base, labels, mileCircle, pointsLayer, centerMarker;
-    const BASE_URL = 'https://{s}.basemaps.cartocdn.com';
+    let map, survey, mileCircle, pointsLayer, centerMarker;
+    // Static "Survey" backdrop — a recolored USGS topo quad (Newton + Boston South,
+    // stitched, orthoimagery stripped) replacing the live CARTO tiles. Geo-anchored
+    // via L.imageOverlay so Leaflet's own fitBounds/zoom math (below) still works
+    // unchanged. Covers roughly a 0.8mi radius around BASE (96 Holton St).
+    const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
+    const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
     const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#ffc600;border:1px solid #1e64dc;box-shadow:0 0 14px #ffc600;filter:drop-shadow(0 0 4px #1e64dc)"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
     const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#1e64dc;border:1px solid #fff;box-shadow:0 0 14px #1e64dc"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
 
     function ensureMap(lat=42.36077, lng=-71.13457){
       if (map) return;
       map = L.map('map', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
-      base = L.tileLayer(BASE_URL + "/light_nolabels/{z}/{x}/{y}{r}.png", { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }).addTo(map);
-      labels = L.tileLayer(BASE_URL + "/light_only_labels/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', opacity: 0.58 }).addTo(map);
+      survey = L.imageOverlay(SURVEY_IMAGE_URL, SURVEY_BOUNDS, { attribution: 'USGS' }).addTo(map);
       pointsLayer = L.layerGroup().addTo(map);
       map.setView([lat, lng], 17);
       setTimeout(() => map.invalidateSize(), 50);
