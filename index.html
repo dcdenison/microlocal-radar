@@ -231,7 +231,7 @@
       }
       applyPortrait();
       reflectUI();
-      if (map) setTimeout(() => map.invalidateSize(), 100);
+      if (map) setTimeout(() => { map.invalidateSize(); fitMapCover(map, L.latLngBounds(SURVEY_BOUNDS)); }, 100);
     }, { passive: true });
 
     applyPortrait();
@@ -343,6 +343,50 @@
     // unchanged. Covers roughly a 0.8mi radius around BASE (96 Holton St).
     const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
     const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
+
+    // fitBounds() alone only ever "contains" the image — it fits the whole
+    // thing inside the view, which leaves empty margins (pillarboxing)
+    // whenever the screen's shape doesn't exactly match the image's shape.
+    // This instead crops to a sub-window of the Survey bounds sized to
+    // match the container's own aspect ratio, then fits THAT — same idea
+    // as CSS background-size:cover. Result: the image always fills the
+    // frame completely, edge to edge, cropping whichever side has extra
+    // instead of leaving gray/black margins.
+    function fitMapCover(mapInst, geoBounds){
+      const size = mapInst.getSize();
+      if (!size.x || !size.y) return;
+      const containerAspect = size.x / size.y;
+      const sw = geoBounds.getSouthWest(), ne = geoBounds.getNorthEast();
+      const centerLat = (sw.lat + ne.lat) / 2, centerLng = (sw.lng + ne.lng) / 2;
+      const KM_PER_DEG_LAT = 111.32;
+      const kmPerDegLng = 111.32 * Math.cos(centerLat * Math.PI / 180);
+      const heightKm = (ne.lat - sw.lat) * KM_PER_DEG_LAT;
+      const widthKm  = (ne.lng - sw.lng) * kmPerDegLng;
+      const imgAspect = widthKm / heightKm;
+
+      let coverBounds;
+      if (containerAspect > imgAspect){
+        // Screen is relatively wider than the image — use its full width,
+        // crop top/bottom.
+        const neededHeightKm = widthKm / containerAspect;
+        const halfHeightDeg = (neededHeightKm / KM_PER_DEG_LAT) / 2;
+        coverBounds = L.latLngBounds(
+          [centerLat - halfHeightDeg, sw.lng],
+          [centerLat + halfHeightDeg, ne.lng]
+        );
+      } else {
+        // Screen is relatively taller than the image — use its full height,
+        // crop left/right.
+        const neededWidthKm = heightKm * containerAspect;
+        const halfWidthDeg = (neededWidthKm / kmPerDegLng) / 2;
+        coverBounds = L.latLngBounds(
+          [sw.lat, centerLng - halfWidthDeg],
+          [ne.lat, centerLng + halfWidthDeg]
+        );
+      }
+      mapInst.fitBounds(coverBounds, { animate: false });
+    }
+
     const DotIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:#f2ff00;border:1px solid #000000;"></div>', iconSize: [14,14], iconAnchor: [7,7] } });
     const CenterIcon = L.DivIcon.extend({ options: { className: '', html: '<div style="width:12px;height:12px;border-radius:50%;background:#ffffff;border:1px solid #f2ff00;"></div>', iconSize: [12,12], iconAnchor: [6,6] } });
 
@@ -367,11 +411,12 @@
       // NOT to the (larger) 1.5mi sample radius circle. The backdrop only
       // covers ~0.8mi around BASE, so fitting to the bigger circle zoomed
       // the map out too far and left the image looking like a tiny patch
-      // surrounded by empty space.
+      // surrounded by empty space. fitMapCover (not a plain fitBounds) also
+      // makes it fill the screen completely rather than leaving letterboxed
+      // margins on whichever side doesn't match the image's own shape.
       const bounds = L.latLngBounds(SURVEY_BOUNDS);
-      map.fitBounds(bounds, { animate: false });
       map.setMaxBounds(bounds.pad(0.05));
-      setTimeout(() => map.invalidateSize(), 50);
+      setTimeout(() => { map.invalidateSize(); fitMapCover(map, bounds); }, 50);
     }
 
     let points = []; let center = null; let sweep = 0; let activeIndex = 0;
