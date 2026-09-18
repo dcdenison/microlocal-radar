@@ -70,7 +70,7 @@
     }
 
     body.portrait canvas {
-      width: 96vw; height: 96vw;
+      width: 99vw; height: 99vw;
       border: 2px solid var(--accent);
       box-shadow: none;
     }
@@ -328,7 +328,7 @@
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const isPortrait = document.body.classList.contains('portrait');
       const size = isPortrait
-        ? window.innerWidth * 0.96
+        ? window.innerWidth * 0.99
         : Math.min(window.innerWidth, window.innerHeight) * 0.98;
       canvas.style.width = size+"px"; canvas.style.height = size+"px";
       canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
