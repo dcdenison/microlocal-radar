@@ -356,9 +356,14 @@
       mileCircle = L.circle([center.lat, center.lng], { radius: 1.5 * 1609.344, color: '#f2ff00', weight: 1.5, fillColor: '#f2ff00', fillOpacity: 0.04 }).addTo(map);
       pointsLayer.clearLayers();
       others.forEach(p => { L.marker([p.lat, p.lng], { icon: new DotIcon() }).addTo(pointsLayer); });
-      const bounds = mileCircle.getBounds();
-      map.fitBounds(bounds.pad(0.15), { animate: false });
-      map.setMaxBounds(bounds.pad(0.30));
+      // Fit the view to the Survey backdrop image's own real-world extent —
+      // NOT to the (larger) 1.5mi sample radius circle. The backdrop only
+      // covers ~0.8mi around BASE, so fitting to the bigger circle zoomed
+      // the map out too far and left the image looking like a tiny patch
+      // surrounded by empty space.
+      const bounds = L.latLngBounds(SURVEY_BOUNDS);
+      map.fitBounds(bounds, { animate: false });
+      map.setMaxBounds(bounds.pad(0.05));
       setTimeout(() => map.invalidateSize(), 50);
     }
 
