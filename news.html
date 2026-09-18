@@ -405,17 +405,14 @@ function drawRadar() {
   const R = h * 0.66;
   ctx.clearRect(0, 0, w, h);
 
-  // Self-painted dark field — the radar no longer depends on the
-  // map tiles for its darkness. The map (if it loads) ghosts through.
-  ctx.fillStyle = 'rgba(0,0,0,0.80)';
+  // Self-painted dark field, matching index.html's opacity (0.55, not 0.80)
+  // so the map underneath reads with the same vividness on both pages.
+  // The old version also added a second darkening vignette on top of this —
+  // index.html doesn't have that layer, and stacking it here is what was
+  // making news.html's map look dimmer and, at the edges, faded to near-
+  // black instead of clearly filling the frame. Removed.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(0, 0, w, h);
-  const vg = ctx.createRadialGradient(cx, cy, R * 0.08, cx, cy, R);
-  vg.addColorStop(0, 'rgba(0,0,0,0.40)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.0)');
-  ctx.fillStyle = vg;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.fill();
 
   // Radial spokes every 30°
   ctx.strokeStyle = 'rgba(255,255,255,0.16)';
