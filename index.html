@@ -566,6 +566,9 @@
     }
     function toNum(v){ const n = parseFloat(String(v ?? "").replace(/[^\d.+-]/g,"").trim()); return Number.isFinite(n) ? n : NaN; }
     function truthy(v){ const s = String(v ?? "").trim().toLowerCase(); return ['1','true','yes','y','t'].includes(s); }
+    // Same "is this row active?" rule samples.html already uses — a blank
+    // cell defaults to active, only an explicit false-ish value hides it.
+    function isRowActive(v){ const s = String(v ?? "").trim().toLowerCase(); if (s === "") return true; return !["0","false","no","n","f","off","inactive","hide","hidden"].includes(s); }
 
     function normalizeRow(row){
       const name = pickField(row, ["name","title","place"], [/(name|title|place)/i]);
@@ -574,7 +577,30 @@
       const notes = pickField(row, ["notes","desc","description"], [/(notes?|desc(ription)?)/i]);
       const image = pickField(row, ["image","photo","img","thumbnail"], [/(image|photo|img|thumbnail)/i]);
       const is_center = truthy(pickField(row, ["is_center","center","iscenter"], [/(is_?center)/i]));
-      return { name, lat, lng, notes, image, is_center, raw: row };
+      const active = isRowActive(pickField(row, ["active","enabled"], [/^\s*(active|enabled)\s*$/i]));
+      return { name, lat, lng, notes, image, is_center, active, raw: row };
+    }
+
+    // Radar shows ONE dot per place, even when the sheet has several rows
+    // for it (multiple sample photos from the same location). Rows are
+    // grouped by name; the group's dot uses the first row that actually
+    // has a horizontal "Image", and is_center is true if any row in the
+    // group says so. The "Sample № " shown beside the active dot is that
+    // representative row's own number — usually the first sample from
+    // that place in the sheet, which is where its other photos follow.
+    function groupPlacesForRadar(rows){
+      const byName = new Map();
+      for (const r of rows){
+        const key = (r.name || '').trim().toLowerCase();
+        if (!byName.has(key)){
+          byName.set(key, { ...r });
+        } else {
+          const g = byName.get(key);
+          if (r.is_center) g.is_center = true;
+          if (!g.image && r.image) g.image = r.image;
+        }
+      }
+      return Array.from(byName.values());
     }
 
     function chooseCenter(validRows){
@@ -634,11 +660,13 @@
         const liveUrl = (STATE.csvUrl || "").trim();
         const csvUrl = STATE.useDemo ? null : (liveUrl ? liveUrl + (liveUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now() : null);
         const raw = STATE.useDemo ? DEMO_ROWS : await loadCSVOnce(csvUrl);
-        const normalized = raw.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        const normalized = raw.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng) && r.active);
         // Assign sample numbers by sheet row order — same rule as samples.html
         normalized.forEach((r, i) => { r.num = i + 1; });
-        const centerRow = chooseCenter(normalized);
-        const others = normalized.filter(r => r !== centerRow);
+        // Collapse multiple sample rows for the same place into one dot
+        const places = groupPlacesForRadar(normalized);
+        const centerRow = chooseCenter(places);
+        const others = places.filter(r => r !== centerRow);
 
         if (!centerRow) {
           statusEl2.textContent = 'No valid center found. Add is_center=TRUE or use URL overrides.';
@@ -665,10 +693,11 @@
         draw();
       }catch(e){
         statusEl2.textContent = 'Load error. Check CSV URL / publish settings. Using DEMO data.';
-        const normalized = DEMO_ROWS.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng));
+        const normalized = DEMO_ROWS.map(normalizeRow).filter(r => isFinite(r.lat) && isFinite(r.lng) && r.active);
         normalized.forEach((r, i) => { r.num = i + 1; });
-        const centerRow = chooseCenter(normalized);
-        const others = normalized.filter(r => r !== centerRow);
+        const places = groupPlacesForRadar(normalized);
+        const centerRow = chooseCenter(places);
+        const others = places.filter(r => r !== centerRow);
         if (centerRow) {
           window.center = center = centerRow;
           window.points = points = others;
