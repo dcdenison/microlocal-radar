@@ -39,7 +39,7 @@
      'screen' blend drops the dark tile background to nothing and lets
      only the bright streets show; the filter pushes those streets to
      near-white so they read as a clean outline of THIS spot on earth. */
-  #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer {
+  #map .leaflet-pane, #map .leaflet-tile, #map .leaflet-layer, #map .leaflet-image-layer {
     filter: grayscale(1) brightness(1.7) contrast(1.9);
     opacity: 0.55;
   }
@@ -267,11 +267,11 @@
 //
 //     Sheet columns: Headline, Source, Story Image URL, Story URL
 //
-//  2. MAP_LAT / MAP_LNG — center of the background radar map.
-//     Currently set to the PPM's BASE location.
-//
-//  3. MAP_ZOOM — bigger number = bigger street outlines.
-//     16 is a good start; try 17 if you want them larger.
+//  2. MAP_LAT / MAP_LNG / MAP_ZOOM — no longer used. The background
+//     map is the static Survey backdrop image, and the view is always
+//     fit to that image's own real-world extent (see below) so it
+//     fills the frame reliably. Left here in case CONFIG is read
+//     elsewhere; safe to ignore.
 //
 //  URL overrides for testing:
 //    news.html?hold=6          (seconds per story)
@@ -314,16 +314,24 @@ const DEMO_STORIES = [
 ];
 
 // ── BACKGROUND MAP ─────────────────────────────────────
+// Static "Survey" backdrop — a recolored USGS topo quad (Newton + Boston South,
+// stitched, orthoimagery stripped), replacing the live CARTO dark tiles. Same
+// image/bounds as index.html so both pages show the same map. The existing
+// 'screen' blend + filter above (unchanged) still does the work of turning it
+// into bright skeletal streets on black.
 const map = L.map('map', {
   zoomControl: false, dragging: false, touchZoom: false,
   scrollWheelZoom: false, doubleClickZoom: false,
   boxZoom: false, keyboard: false
 });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-}).addTo(map);
-map.setView([CONFIG.MAP_LAT, CONFIG.MAP_LNG], CONFIG.MAP_ZOOM);
+const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
+const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
+L.imageOverlay(SURVEY_IMAGE_URL, SURVEY_BOUNDS, { attribution: 'USGS' }).addTo(map);
+// Fit the view to the backdrop image's own real-world extent (not a fixed
+// zoom level) so it reliably fills the frame on any screen size — same fix
+// applied on index.html, where a mismatched zoom left the image looking
+// like a tiny patch surrounded by empty space.
+map.fitBounds(SURVEY_BOUNDS, { animate: false });
 setTimeout(() => map.invalidateSize(), 100);
 
 // ── RADAR RINGS + THIN SWEEP ───────────────────────────
