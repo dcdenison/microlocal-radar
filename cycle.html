@@ -11,7 +11,7 @@
 
     html, body {
       width: 100%; height: 100%;
-      background: #000818;
+      background: #000000;
       overflow: hidden;
     }
 
@@ -21,7 +21,7 @@
       width: 100%;
       height: 100%;
       border: none;
-      background: #000818;
+      background: #000000;
       transition: opacity 1.2s ease;
     }
 
@@ -62,6 +62,16 @@
   const slotA = document.getElementById('slot-a');
   const slotB = document.getElementById('slot-b');
 
+  // Tell a page it is now on screen, so it starts advancing its own
+  // sequence (radar places, samples, news stories) from that moment.
+  let visibleFrame = slotA;
+  function signalShown(frame) {
+    try { frame.contentWindow.postMessage('ppm:show', '*'); } catch (e) {}
+  }
+  [slotA, slotB].forEach(f => f.addEventListener('load', () => {
+    if (f === visibleFrame) signalShown(f);
+  }));
+
   let currentIndex = 0;
   let nextIndex    = 1 % PAGES.length;
   let aIsTop       = false;
@@ -83,10 +93,14 @@
     const incoming = aIsTop ? slotB : slotA;
     const outgoing = aIsTop ? slotA : slotB;
 
-    incoming.src = PAGES[nextIndex];
+    // The incoming page was already loaded (hidden) after the previous
+    // fade, so it's ready to show instantly — no reload here.
 
     incoming.style.zIndex  = '3';
     outgoing.style.zIndex  = '2';
+
+    visibleFrame = incoming;
+    signalShown(incoming);
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
