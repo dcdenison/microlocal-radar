@@ -280,6 +280,31 @@ function slideHTML(sample, index) {
     ${photoHTML}`;
 }
 
+// ── CYCLE SUPPORT ──────────────────────────────────────
+// 1) Remembers where this page's sequence left off, so each visit in
+//    cycle.html picks up at the NEXT item instead of restarting at #1.
+// 2) When running inside cycle.html, the page is loaded hidden ahead of
+//    time. It waits for cycle.html's "ppm:show" signal before it starts
+//    advancing, so no items get used up while nobody can see them.
+//    Opened on its own (not in the cycle), it runs normally right away.
+const IN_CYCLE = window.self !== window.top;
+let PPM_SHOWN = !IN_CYCLE;
+const PPM_QUEUE = [];
+function ppmMarkShown(){ if (PPM_SHOWN) return; PPM_SHOWN = true; PPM_QUEUE.splice(0).forEach(f => f()); }
+window.addEventListener('message', e => { if (e.data === 'ppm:show') ppmMarkShown(); });
+setTimeout(ppmMarkShown, 180000); // safety net if the signal never arrives
+function whenShown(fn){ PPM_SHOWN ? fn() : PPM_QUEUE.push(fn); }
+function nextPos(key, n){
+  if (!n) return 0;
+  try { const v = parseInt(localStorage.getItem(key), 10); return Number.isInteger(v) ? (v + 1) % n : 0; }
+  catch (e) { return 0; }
+}
+function savePos(key, i){
+  // Only record progress once the page is actually on screen
+  if (!PPM_SHOWN) { PPM_QUEUE.push(() => savePos(key, i)); return; }
+  try { localStorage.setItem(key, String(i)); } catch (e) {}
+}
+
 // ── LOAD + RUN SEQUENCE ────────────────────────────────
 const slideEl   = document.getElementById("slide");
 const statusEl  = document.getElementById("status");
@@ -291,6 +316,7 @@ let current = 0;
 function showSlide(i) {
   const s = samples[i];
   slideEl.innerHTML = slideHTML(s, i);
+  savePos("ppm-pos-samples", i);
   counterEl.textContent =
     String(i + 1).padStart(3, "0") + " / " + String(samples.length).padStart(3, "0");
 
@@ -318,13 +344,16 @@ Papa.parse(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "cb=" + Date.now(), {
     }
 
     statusEl.style.display = "none";
-    showSlide(0);
+    current = nextPos("ppm-pos-samples", samples.length);
+    showSlide(current);
 
     if (samples.length > 1) {
-      setInterval(() => {
-        current = (current + 1) % samples.length;
-        showSlide(current);
-      }, HOLD_MS);
+      whenShown(() => {
+        setInterval(() => {
+          current = (current + 1) % samples.length;
+          showSlide(current);
+        }, HOLD_MS);
+      });
     }
   },
   error: () => {
