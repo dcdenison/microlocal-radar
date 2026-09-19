@@ -62,15 +62,24 @@
     /* ── PORTRAIT / SHORTS MODE ─────────────────────────────────────────── */
     body.portrait { background: #000000; }
 
-    body.portrait #map { bottom: 40%; }
+    /* Layout math (portrait): the card at the bottom holds a full-width
+       16:9 photo plus a fixed-height label strip. The radar gets whatever
+       height is left above it, and the circle is sized to fit inside that
+       space — so it's never cut off and the photo is never squashed. */
+    body.portrait {
+      --img-h: calc(100vw * 9 / 16);
+      --label-h: clamp(110px, 12vh, 170px);
+      --card-h: calc(var(--img-h) + var(--label-h));
+    }
+
+    body.portrait #map { bottom: var(--card-h); }
 
     body.portrait #stage {
-      top: 0; bottom: 40%; left: 0; right: 0;
+      top: 0; bottom: var(--card-h); left: 0; right: 0;
       position: fixed; display: grid; place-items: center;
     }
 
     body.portrait canvas {
-      width: 99vw; height: 99vw;
       border: 2px solid var(--accent);
       box-shadow: none;
     }
@@ -86,14 +95,14 @@
       border-left: none; border-right: none; border-bottom: none;
       border-top: 2px solid #ffffff;
       display: flex; flex-direction: column;
-      height: 40%;
+      height: var(--card-h);
       box-shadow: none;
     }
 
-    /* Horizontal image across full width, fixed height */
+    /* Horizontal 16:9 image across the full width */
     body.portrait #card .img {
       width: 100%; flex-shrink: 0;
-      height: 52%;
+      height: var(--img-h);
       aspect-ratio: unset;
       border-bottom: 2px solid #ffffff;
     }
@@ -182,6 +191,31 @@
       initRadar();
     });
     
+// ── CYCLE SUPPORT ──────────────────────────────────────
+// 1) Remembers where this page's sequence left off, so each visit in
+//    cycle.html picks up at the NEXT item instead of restarting at #1.
+// 2) When running inside cycle.html, the page is loaded hidden ahead of
+//    time. It waits for cycle.html's "ppm:show" signal before it starts
+//    advancing, so no items get used up while nobody can see them.
+//    Opened on its own (not in the cycle), it runs normally right away.
+const IN_CYCLE = window.self !== window.top;
+let PPM_SHOWN = !IN_CYCLE;
+const PPM_QUEUE = [];
+function ppmMarkShown(){ if (PPM_SHOWN) return; PPM_SHOWN = true; PPM_QUEUE.splice(0).forEach(f => f()); }
+window.addEventListener('message', e => { if (e.data === 'ppm:show') ppmMarkShown(); });
+setTimeout(ppmMarkShown, 180000); // safety net if the signal never arrives
+function whenShown(fn){ PPM_SHOWN ? fn() : PPM_QUEUE.push(fn); }
+function nextPos(key, n){
+  if (!n) return 0;
+  try { const v = parseInt(localStorage.getItem(key), 10); return Number.isInteger(v) ? (v + 1) % n : 0; }
+  catch (e) { return 0; }
+}
+function savePos(key, i){
+  // Only record progress once the page is actually on screen
+  if (!PPM_SHOWN) { PPM_QUEUE.push(() => savePos(key, i)); return; }
+  try { localStorage.setItem(key, String(i)); } catch (e) {}
+}
+
     function initRadar() {
     let KIOSK_MODE = false;
 
@@ -326,10 +360,11 @@
     const ctx = canvas.getContext('2d');
     function fitCanvas(){
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const isPortrait = document.body.classList.contains('portrait');
-      const size = isPortrait
-        ? window.innerWidth * 0.99
-        : Math.min(window.innerWidth, window.innerHeight) * 0.98;
+      // Size the circle to fit the radar's own area (the whole screen in
+      // landscape; the space above the photo card in portrait) so no part
+      // of the circle is ever cut off.
+      const stageRect = document.getElementById('stage').getBoundingClientRect();
+      const size = Math.min(stageRect.width, stageRect.height) * 0.98;
       canvas.style.width = size+"px"; canvas.style.height = size+"px";
       canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
       ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -689,7 +724,7 @@
         });
         debugEl.innerHTML = debugLines.join('<br>');
 
-        if(points.length) setCard(points[0]);
+        if(points.length){ activeIndex = nextPos('ppm-pos-radar', points.length); setCard(points[activeIndex]); savePos('ppm-pos-radar', activeIndex); }
         draw();
       }catch(e){
         statusEl2.textContent = 'Load error. Check CSV URL / publish settings. Using DEMO data.';
@@ -709,7 +744,7 @@
             debugLines.push(`№${String(p.num).padStart(3,'0')} ${(p.name||'?').substring(0,20)} | ${d.toFixed(2)}mi | ${b.toFixed(0)}°`);
           });
           debugEl.innerHTML = debugLines.join('<br>');
-          if(points.length) setCard(points[0]);
+          if(points.length){ activeIndex = nextPos('ppm-pos-radar', points.length); setCard(points[activeIndex]); savePos('ppm-pos-radar', activeIndex); }
           draw();
         }
       }
@@ -729,11 +764,13 @@
     ];
 
     (function loop(){ function tick(){ sweep = (sweep + 0.95) % 360; draw(); requestAnimationFrame(tick); } tick(); })();
-    setInterval(()=>{
-      if(points.length){
-        activeIndex=(activeIndex+1)%points.length; setCard(points[activeIndex]); draw();
-      }
-    }, 20000);
+    whenShown(() => {
+      setInterval(()=>{
+        if(points.length){
+          activeIndex=(activeIndex+1)%points.length; setCard(points[activeIndex]); savePos('ppm-pos-radar', activeIndex); draw();
+        }
+      }, 20000);
+    });
 
     document.getElementById("csvUrlInput").value = STATE.csvUrl;
     applyPreset();
