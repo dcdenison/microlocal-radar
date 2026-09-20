@@ -280,7 +280,20 @@ function savePos(key, i){
     }
 
     const FIXED_RADIUS_MILES = 1.5;
-    const JITTER_DEG         = 8.0;
+    // JITTER_DEG rotates each dot off its true bearing by up to this many
+    // degrees (stable per place, so it never jumps). It was 8.0, which looks
+    // pleasingly organic but throws a dot ~590ft sideways at 0.8mi out — the
+    // single biggest reason dots didn't sit on their real locations. Set to 0
+    // for survey-accurate placement. Raise it again only if you want the
+    // scattered look back.
+    const JITTER_DEG         = 0;
+    // When true, dots are positioned by asking Leaflet where each lat/lng
+    // actually falls on the backdrop, instead of plotting bearing+distance
+    // against FIXED_RADIUS_MILES. That old approach used a 1.5mi radar radius
+    // while the Survey backdrop only spans about 0.5mi to the radar's rim —
+    // a 3x scale mismatch, so every dot sat far too close to the center.
+    // Set to false to go back to the old bearing/distance plot.
+    const MAP_ALIGNED_DOTS   = true;
     const DECLUMP_MIN_PX     = 16;
 
     const toggleDemo  = document.getElementById("toggleDemo");
@@ -427,7 +440,12 @@ function savePos(key, i){
 
     function ensureMap(lat=42.36077, lng=-71.13457){
       if (map) return;
-      map = L.map('map', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+      // zoomSnap: 0 is essential. Leaflet normally rounds every fitBounds()
+      // DOWN to a whole zoom level, which quietly undoes the "cover" math in
+      // fitMapCover() below and leaves black gutters around the backdrop.
+      // With zoomSnap 0 the map can sit at a fractional zoom and fill the
+      // frame exactly, edge to edge.
+      map = L.map('map', { zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, zoomSnap: 0, zoomDelta: 0.25 });
       survey = L.imageOverlay(SURVEY_IMAGE_URL, SURVEY_BOUNDS, { attribution: 'USGS' }).addTo(map);
       pointsLayer = L.layerGroup().addTo(map);
       map.setView([lat, lng], 17);
@@ -450,7 +468,9 @@ function savePos(key, i){
       // makes it fill the screen completely rather than leaving letterboxed
       // margins on whichever side doesn't match the image's own shape.
       const bounds = L.latLngBounds(SURVEY_BOUNDS);
-      map.setMaxBounds(bounds.pad(0.05));
+      // No setMaxBounds here — panning is already disabled, and a maxBounds
+      // clamp fights fitMapCover's edge-to-edge crop by nudging the view back
+      // inside the image, which reintroduces a sliver of black at one edge.
       setTimeout(() => { map.invalidateSize(); fitMapCover(map, bounds); }, 50);
     }
 
@@ -461,9 +481,36 @@ function savePos(key, i){
     }
     function projectMicrolocal(p){
       const d = haversineMiles(center, p);
-      const b = bearingDeg(center, p);
       const w = canvas.width / (window.devicePixelRatio||1);
       const R = (w/2) - 16;
+
+      // ── MAP-ALIGNED PLACEMENT ────────────────────────────────────────
+      // Ask Leaflet for the pixel this lat/lng lands on in the backdrop,
+      // then translate that from map-container coordinates into canvas
+      // coordinates. Because it goes through the same projection that draws
+      // the map, a dot lands exactly on its place — no scale constant to
+      // keep in sync, and it stays correct at any screen size or zoom.
+      if (MAP_ALIGNED_DOTS && map){
+        const mapEl = document.getElementById('map');
+        if (mapEl){
+          const mRect = mapEl.getBoundingClientRect();
+          const cRect = canvas.getBoundingClientRect();
+          const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+          let x = (mRect.left + pt.x) - cRect.left;
+          let y = (mRect.top  + pt.y) - cRect.top;
+          // Anything beyond the backdrop's coverage gets pulled back to the
+          // rim, so it still reads in the correct direction rather than
+          // vanishing off-screen. Affects samples farther out than the map
+          // extends (currently Brighton Emporium, Boston Landing,
+          // Allston Yards).
+          const dx = x - w/2, dy = y - w/2;
+          const rr = Math.hypot(dx, dy);
+          if (rr > R && rr > 0){ x = w/2 + dx * (R/rr); y = w/2 + dy * (R/rr); }
+          return { x, y, distance: d };
+        }
+      }
+
+      const b = bearingDeg(center, p);
       const frac = Math.min(1, d / FIXED_RADIUS_MILES);
       const e = exaggerate(frac);
       const seed = (p.name||'') + '|' + p.lat + '|' + p.lng;
