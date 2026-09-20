@@ -325,11 +325,23 @@ const DEMO_STORIES = [
 // the radar canvas (see #map / #radar CSS above) and is just dimmed with a
 // plain opacity/contrast filter — no color-stripping or blend-mode needed,
 // since the backdrop is already clean brutalist black/white/acid-yellow.
+// zoomSnap: 0 is essential. Leaflet normally rounds every fitBounds() DOWN
+// to a whole zoom level, which quietly undoes the "cover" math in
+// fitMapCover() below and leaves black gutters around the backdrop. With
+// zoomSnap 0 the map can sit at a fractional zoom and fill the frame
+// exactly, edge to edge.
 const map = L.map('map', {
   zoomControl: false, dragging: false, touchZoom: false,
   scrollWheelZoom: false, doubleClickZoom: false,
-  boxZoom: false, keyboard: false
+  boxZoom: false, keyboard: false,
+  zoomSnap: 0, zoomDelta: 0.25
 });
+
+// How much bigger than "just filling the frame" the backdrop should be on
+// this page. 1.0 = exactly fills the frame. 1.4 = 40% bigger, cropping in
+// closer so street names read from across a room. This is the one number to
+// turn if you want the news map larger or smaller.
+const MAP_ZOOM_BOOST = 1.4;
 const SURVEY_IMAGE_URL = 'https://raw.githubusercontent.com/dcdenison/microlocal-radar/main/images/survey-backdrop.png';
 const SURVEY_BOUNDS = [[42.348414, -71.153357], [42.371598, -71.122117]];
 L.imageOverlay(SURVEY_IMAGE_URL, SURVEY_BOUNDS, { attribution: 'USGS' }).addTo(map);
@@ -373,6 +385,11 @@ function fitMapCover(mapInst, geoBounds){
     );
   }
   mapInst.fitBounds(coverBounds, { animate: false });
+  // Then crop in further by MAP_ZOOM_BOOST. Each whole zoom level doubles the
+  // scale, so a boost of 1.4 is log2(1.4) ≈ 0.49 extra zoom levels.
+  if (MAP_ZOOM_BOOST && MAP_ZOOM_BOOST !== 1){
+    mapInst.setZoom(mapInst.getZoom() + Math.log2(MAP_ZOOM_BOOST), { animate: false });
+  }
 }
 
 // Fit the view to the backdrop image's own real-world extent, cropped to
